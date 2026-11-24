@@ -129,7 +129,7 @@ describe('tool server', () => {
     const port = Number(new URL(s.url).port);
     const reply = await new Promise<string>((resolve) => {
       const sock = net.connect(port, '127.0.0.1', () =>
-        sock.write('GET http://[ HTTP/1.1\r\nHost: x\r\n\r\n'),
+        sock.write(`GET http://[ HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\n\r\n`),
       );
       let buf = '';
       sock.on('data', (d) => (buf += d));
@@ -137,7 +137,7 @@ describe('tool server', () => {
       sock.on('error', () => resolve(buf));
       setTimeout(() => sock.destroy(), 500);
     });
-    expect(reply).toMatch(/^HTTP\/1\.1 (400|403)/);
+    expect(reply).toMatch(/^HTTP\/1\.1 400 /);
     expect((await fetch(new URL('/', s.url))).status).toBe(200);
   });
 
@@ -164,8 +164,8 @@ describe('tool server', () => {
     expect(img.headers.get('x-content-type-options')).toBe('nosniff');
     const html = await fetch(new URL('/tool/../x', s.url));
     expect(html.status).toBe(404);
-    fs.writeFileSync(path.join(dir, 'a.html'), '<p>x</p>');
     const t = await fetch(new URL('/', s.url));
-    expect(t.headers.get('content-type')).toMatch(/text\/plain|text\/html/);
+    expect(t.headers.get('content-type')).toMatch(/^text\/html/);
+    expect(t.headers.get('referrer-policy')).toBe('no-referrer');
   });
 });
