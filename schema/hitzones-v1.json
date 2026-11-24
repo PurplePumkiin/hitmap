@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/PurplePumkiin/hitzones/blob/main/schema/hitzones-v1.json",
+  "title": "hitzones v1",
+  "description": "Invisible click zones over an image, in the image's own pixel coordinates. Zone order is z-order: later zones sit on top.",
+  "type": "object",
+  "required": ["hitzones", "image", "zones"],
+  "additionalProperties": true,
+  "properties": {
+    "hitzones": { "const": 1, "description": "Format version." },
+    "image": {
+      "type": "object",
+      "required": ["width", "height"],
+      "additionalProperties": true,
+      "properties": {
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "height": { "type": "number", "exclusiveMinimum": 0 },
+        "src": { "type": "string", "description": "Informational only." }
+      }
+    },
+    "zones": {
+      "type": "array",
+      "description": "Labels must be unique across the array (not expressible in JSON Schema; checked by parseZones).",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": ["label", "shape", "x", "y", "width", "height"],
+            "additionalProperties": true,
+            "properties": {
+              "label": { "type": "string", "minLength": 1 },
+              "shape": { "const": "rect" },
+              "x": { "type": "number" },
+              "y": { "type": "number" },
+              "width": { "type": "number", "exclusiveMinimum": 0 },
+              "height": { "type": "number", "exclusiveMinimum": 0 },
+              "data": {}
+            }
+          },
+          {
+            "type": "object",
+            "required": ["label", "shape", "cx", "cy", "rx", "ry"],
+            "additionalProperties": true,
+            "properties": {
+              "label": { "type": "string", "minLength": 1 },
+              "shape": { "const": "ellipse" },
+              "cx": { "type": "number" },
+              "cy": { "type": "number" },
+              "rx": { "type": "number", "exclusiveMinimum": 0 },
+              "ry": { "type": "number", "exclusiveMinimum": 0 },
+              "data": {}
+            }
+          },
+          {
+            "type": "object",
+            "required": ["label", "shape", "points"],
+            "additionalProperties": true,
+            "properties": {
+              "label": { "type": "string", "minLength": 1 },
+              "shape": { "const": "polygon" },
+              "points": {
+                "type": "array",
+                "minItems": 3,
+                "items": { "type": "array", "prefixItems": [{ "type": "number" }, { "type": "number" }], "minItems": 2, "maxItems": 2 }
+              },
+              "data": {}
+            }
+          }
+        ]
+      }
+    }
+  }
+}

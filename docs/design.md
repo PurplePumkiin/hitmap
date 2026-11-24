@@ -54,7 +54,7 @@ It will be open source under the author's GitHub account (`PurplePumkiin/hitzone
 - Clicks that hit no zone are reported (`miss`).
 - No automatic minimum tap size. If a target should be bigger, draw it bigger.
 - Name `hitzones`, published to npm as a 0.0.1 placeholder on 2026-11-24 to hold the name. (`hitmap` was refused by npm as too similar to the existing `hit-map`.) Public repo `PurplePumkiin/hitzones`.
-- **Nothing is committed until the README and license are agreed with the author.** The license is undecided (MIT or Apache-2.0).
+- **Nothing is committed until the README and license are agreed with the author.** License: MIT, © Dennis Friend (agreed 2026-11-23).
 
 ## The data format (`hitzones` v1)
 
@@ -198,7 +198,7 @@ hitzones/
   test/           unit + browser tests
   examples/       a minimal page using the package
   docs/design.md  this document
-  README.md, LICENSE   (to be agreed before the first commit)
+  README.md, LICENSE
 ```
 
 ## Testing
