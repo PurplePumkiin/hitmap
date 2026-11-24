@@ -27,7 +27,9 @@ function zonePosition(z: Zone, L: Layout): Position {
 
 export function createZones(img: HTMLImageElement, json: unknown, options: Options = {}): Hitzones {
   const data = parseZones(json);
-  const opts: Required<Options> = { keyboard: false, cursor: 'pointer', className: 'hitzones', debug: false, ...options };
+  const opts: Required<Options> = { keyboard: false, cursor: 'pointer', className: 'hitzones', debug: false };
+  // Only defined keys override a default: `{ className: undefined }` keeps 'hitzones'.
+  for (const [k, v] of Object.entries(options ?? {})) if (v !== undefined) (opts as Record<string, unknown>)[k] = v;
   const emitter = createEmitter<HitzonesEvents>();
   const overlay = createOverlay(img, data, opts);
   const zones = new Map(data.zones.map((z) => [z.label, z] as const));

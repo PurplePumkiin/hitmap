@@ -305,6 +305,20 @@ test('cursor option and className reach the DOM', async ({ page }) => {
   expect((await events(page)).map((e: any) => e.label)).toEqual(['box']);
 });
 
+test('explicit undefined options keep the defaults', async ({ page }) => {
+  await setup(page);
+  const r = await page.evaluate(() => {
+    const w = window as any;
+    w.hz.destroy();
+    w.hz = w.Hitzones.createZones(document.getElementById('img'), w.json, {
+      className: undefined, cursor: undefined, keyboard: undefined, debug: undefined,
+    });
+    const svg = document.querySelector('svg')!;
+    return { cls: svg.getAttribute('class'), cursor: getComputedStyle(svg.querySelector('.hitzone')!).cursor };
+  });
+  expect(r).toEqual({ cls: 'hitzones', cursor: 'pointer' });
+});
+
 test('a zone click bubbles to a wrapping <a>, not to the img', async ({ page }) => {
   await setup(page, { wrapTag: 'a' });
   await page.evaluate(() => {
@@ -321,4 +335,23 @@ test('a zone click bubbles to a wrapping <a>, not to the img', async ({ page }) 
   expect((await events(page)).map((e: any) => e.label)).toEqual(['box']);
   await clickImage(page, 250, 30);
   expect(await page.evaluate(() => (window as any).native)).toEqual({ a: 2, img: 1 });
+});
+
+test('inside an inline <a href="#"> wrapper: zones align and clicks emit', async ({ page }) => {
+  await setup(page, { wrapTag: 'a', wrap: 'display:inline', img: 'width:800px;height:auto' });
+  const r = await page.evaluate(() => {
+    const b = (el: Element) => {
+      const r = el.getBoundingClientRect();
+      return { x: r.left, y: r.top, width: r.width, height: r.height };
+    };
+    document.getElementById('wrap')!.addEventListener('click', (e) => e.preventDefault());
+    return { display: getComputedStyle(document.getElementById('wrap')!).display, img: b(document.getElementById('img')!), svg: b(document.querySelector('svg')!) };
+  });
+  expect(r.display).toBe('inline');
+  for (const k of ['x', 'y', 'width', 'height'] as const)
+    expect(Math.abs(r.svg[k] - r.img[k]), `${k}: ${r.svg[k]} vs ${r.img[k]}`).toBeLessThanOrEqual(1);
+  await clickImage(page, 30, 30);
+  await clickImage(page, 200, 100);
+  await clickImage(page, 250, 30);
+  expect((await events(page)).map((e: any) => e.type + ':' + (e.label ?? ''))).toEqual(['click:box', 'click:ring', 'miss:']);
 });
