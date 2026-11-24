@@ -15,14 +15,14 @@ export function parseZones(input: unknown): ZonesJSON {
   if (!isObj(img) || !num(img.width) || !num(img.height) || img.width <= 0 || img.height <= 0)
     return fail('image.width and image.height must be positive numbers');
   if (!Array.isArray(input.zones)) return fail('zones must be an array');
-  const seen: Record<string, true> = {};
+  const seen = new Set<string>();
   input.zones.forEach((z: unknown, i: number) => {
     if (!isObj(z)) return fail(`zones[${i}] must be an object`);
     const label = z.label;
     if (typeof label !== 'string' || !label) return fail(`zones[${i}] needs a non-empty label`);
     const at = `zones[${i}] "${label}"`;
-    if (seen[label]) return fail(`duplicate label "${label}" (zones[${i}])`);
-    seen[label] = true;
+    if (seen.has(label)) return fail(`duplicate label "${label}" (zones[${i}])`);
+    seen.add(label);
     const nums = (keys: string[], positive: string[] = []) => {
       for (const k of keys) {
         const v = z[k];

@@ -58,6 +58,11 @@ describe('parseZones', () => {
     });
   }
 
+  it('accepts labels that match Object.prototype names', () => {
+    const zones = ['constructor', '__proto__', 'toString'].map((label) => ({ ...z0, label }));
+    expect(() => parseZones({ ...valid, zones })).not.toThrow();
+  });
+
   it('names the duplicate label', () => {
     expect(() => parseZones({ ...valid, zones: [z0, z0] })).toThrow(/duplicate label "lighthouse"/);
   });
