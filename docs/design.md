@@ -183,7 +183,7 @@ hitzones reports clicks. It doesn't decide how a game is made accessible. The RE
 ## Packaging
 
 - One npm package containing `dist/`, `schema/`, `tool/` and `bin/`. Its `exports` map has `"."` (ESM + types, with the IIFE as a separate file path) and `"./schema"`.
-- The tool needs Node 18+. The package supports the last two versions of Chrome, Edge, Firefox and Safari, plus iOS Safari 15+.
+- The tool needs Node 24+ (raised from 18 on 2026-11-24; 18 and 20 are end-of-life). The package supports the last two versions of Chrome, Edge, Firefox and Safari, plus iOS Safari 15+.
 - The tool's preview loads `dist/`. In the repo, `npm run tool` builds first.
 
 ## Repo layout

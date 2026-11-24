@@ -14,7 +14,7 @@
     "./iife": "./dist/hitzones.iife.js",
     "./schema": "./schema/hitzones-v1.json"
   },
-  "engines": { "node": ">=18" },
+  "engines": { "node": ">=24" },
   "scripts": {
     "build": "esbuild src/index.ts --bundle --minify --format=esm --outfile=dist/hitzones.js && esbuild src/index.ts --bundle --minify --format=iife --global-name=Hitzones --outfile=dist/hitzones.iife.js && tsc -p tsconfig.json --emitDeclarationOnly --outDir dist",
     "size": "node scripts/size.mjs",
