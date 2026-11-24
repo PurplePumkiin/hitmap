@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>hitzones example</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 1rem; }
+    #scene { display: block; max-width: 100%; height: auto; }
+    pre { background: #f4f4f4; padding: .5rem; min-height: 6rem; overflow: auto; }
+  </style>
+</head>
+<body>
+  <h1>hitzones example</h1>
+  <p>Click the sun, the house or the tree. Clicks elsewhere on the picture are logged as misses.</p>
+  <img id="scene" src="scene.svg" width="800" height="500" alt="A sun, a house and a tree">
+  <pre id="log"></pre>
+  <script type="module">
+    import { createZones } from '../dist/hitzones.js';
+
+    const zones = await (await fetch('zones.json')).json();
+    const log = document.querySelector('#log');
+    const say = (text) => { log.textContent += text + '\n'; };
+    const map = createZones(document.querySelector('#scene'), zones);
+
+    map.on('click', (e) => say(`click ${e.label} (${e.status}, ${e.clicks})`));
+    map.on('miss', (e) => say(`miss at image ${Math.round(e.point.image.x)},${Math.round(e.point.image.y)}`));
+    map.on('layout', () => say('layout'));
+  </script>
+</body>
+</html>

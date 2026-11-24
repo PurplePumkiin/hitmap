@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>hitzones editor</title>
+  <link rel="stylesheet" href="/tool/editor.css">
+  <script type="module" src="/tool/js/main.js"></script>
+</head>
+<body>
+  <header class="bar">
+    <strong class="brand">hitzones</strong>
+    <div class="group" role="toolbar" aria-label="Tools">
+      <button type="button" data-tool="select" aria-pressed="true" title="Select, move, resize (V)">Select</button>
+      <button type="button" data-tool="rect" aria-pressed="false" title="Rectangle (R)">Rect</button>
+      <button type="button" data-tool="ellipse" aria-pressed="false" title="Ellipse (E)">Ellipse</button>
+      <button type="button" data-tool="polygon" aria-pressed="false" title="Polygon (P): click points, Enter to close">Polygon</button>
+    </div>
+    <div class="group">
+      <button type="button" data-action="open-image">Open image</button>
+      <button type="button" data-action="open-json">Open zones</button>
+      <input type="file" id="file-image" accept="image/*" hidden>
+      <input type="file" id="file-json" accept=".json,application/json" hidden>
+      <button type="button" data-action="fit" title="Fit image to view">Fit</button>
+      <button type="button" data-action="preview">Preview</button>
+      <button type="button" data-action="save" class="primary" title="Save (Ctrl+S)">Save</button>
+    </div>
+    <output id="status" aria-live="polite"></output>
+  </header>
+
+  <div id="rescale-bar" class="notice" hidden>
+    <span class="msg"></span>
+    <button type="button" data-action="rescale">Rescale zones</button>
+    <button type="button" data-action="keep">Keep as is</button>
+  </div>
+
+  <main class="work">
+    <section class="stage" id="stage">
+      <svg id="canvas" tabindex="0" aria-label="Zone canvas">
+        <g id="view"></g>
+      </svg>
+      <p class="empty" id="empty">Open or drop an image to start. Nothing leaves this computer.</p>
+    </section>
+    <aside class="panel">
+      <h2>Zones <small>top of list is on top</small></h2>
+      <ol id="zones"></ol>
+    </aside>
+  </main>
+
+  <dialog id="preview">
+    <form method="dialog" class="bar">
+      <strong>Preview</strong>
+      <div class="group">
+        <button type="button" data-width="375">Phone 375</button>
+        <button type="button" data-width="768">Tablet 768</button>
+        <button type="button" data-width="1280">Desktop 1280</button>
+      </div>
+      <label>Width <input type="range" name="width" min="200" max="1600" step="1" value="768"> <span class="px"></span></label>
+      <button value="close">Close</button>
+    </form>
+    <div class="preview-body">
+      <div class="frame"></div>
+      <ol class="log" aria-label="Event log"></ol>
+    </div>
+  </dialog>
+</body>
+</html>
