@@ -47,12 +47,11 @@ function apply(fn, nextSelected = selected) {
 }
 /** Shows an apply() error, if any, in the status line. */
 const report = (err) => err && status(err, 'error');
-const isUnique = (i) => doc.zones.filter((z) => z.label === doc.zones[i].label).length === 1;
 // Label-keyed model ops would hit every namesake, so a duplicated label is read-only on the
 // canvas (and can't be selected or reordered) until it is renamed in the panel.
 const isDuplicate = (label) => doc.zones.filter((z) => z.label === label).length > 1;
 const refuse = (label) => status(`Rename duplicate label "${label}" to edit it`, 'error');
-// Index-based edits, for zones whose label is not unique (only possible in a loaded file).
+// Index-based edits: they hit only that row, even when its label is duplicated.
 const patchAt = (i, fn) => (d) => ({ ...d, zones: d.zones.map((z, j) => (j === i ? fn(z) : z)) });
 
 const canvas = createCanvas($('#canvas'), {
@@ -92,7 +91,6 @@ const panel = createPanel($('#zones'), {
     } catch (e) {
       return 'data is not valid JSON: ' + errText(e);
     }
-    if (isUnique(i)) return apply((d) => updateZone(d, d.zones[i].label, { data }));
     return apply(patchAt(i, (z) => ({ ...z, data })));
   },
   onMove(i, delta) {
@@ -103,7 +101,6 @@ const panel = createPanel($('#zones'), {
   onRemove(i) {
     const label = doc.zones[i].label;
     const next = selected === label ? null : selected;
-    if (isUnique(i)) return apply((d) => removeZone(d, label), next);
     apply((d) => ({ ...d, zones: d.zones.filter((_, j) => j !== i) }), next);
   },
   // Focusing a duplicate's row (to rename it) leaves the selection alone.

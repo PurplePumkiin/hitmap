@@ -32,7 +32,7 @@ export function addZone(doc, zone) {
 }
 
 export function updateZone(doc, label, patch) {
-  if (patch && 'label' in patch) throw new TypeError('updateZone cannot change the label; use renameZone');
+  if (patch && 'label' in patch) throw new TypeError('updateZone cannot change the label; use renameZoneAt');
   return { ...doc, zones: doc.zones.map((z) => (z.label === label ? { ...z, ...clone(patch) } : z)) };
 }
 
@@ -47,13 +47,6 @@ export function moveZone(doc, label, toIndex) {
   const [z] = zones.splice(from, 1);
   zones.splice(Math.max(0, Math.min(zones.length, toIndex)), 0, z);
   return { ...doc, zones };
-}
-
-export function renameZone(doc, from, to) {
-  if (!doc.zones.some((z) => z.label === from)) throw new Error(`unknown label "${from}"`);
-  if (!to) throw new Error('label must not be empty');
-  if (to !== from && doc.zones.some((z) => z.label === to)) throw new Error(`label "${to}" is already used`);
-  return { ...doc, zones: doc.zones.map((z) => (z.label === from ? { ...z, label: to } : z)) };
 }
 
 /** Renames the zone at `index` only; for files whose labels are not unique yet. */

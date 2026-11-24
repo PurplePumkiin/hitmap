@@ -181,6 +181,12 @@ test('preview at 375px logs a click event for a zone', async ({ page }) => {
   await page.mouse.click(b.x + 2, b.y + b.height - 2);
   await expect(dialog.locator('.log')).toContainText('miss');
   await expect(dialog.locator('svg.hitzones')).toHaveCount(1);
+  // The map lives for the whole preview, so a width change keeps the click count.
+  await dialog.locator('[data-width="768"]').click();
+  await expect.poll(async () => (await img.boundingBox())!.width).toBeCloseTo(768, 0);
+  const c = (await img.boundingBox())!;
+  await page.mouse.click(c.x + (200 * c.width) / 400, c.y + (100 * c.height) / 200);
+  await expect(dialog.locator('.log')).toContainText('click ring (reclicked, 2)');
 });
 
 test('without paths: open image by file input, save downloads', async ({ page }) => {

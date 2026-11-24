@@ -25,12 +25,6 @@ describe('model', () => {
     d = m.removeZone(d, 'zone-1');
     expect(d.zones.map((z: any) => z.label)).toEqual(['zone-2']);
   });
-  it('renameZone throws on duplicate or empty', () => {
-    const d = m.addZone(m.addZone(m.createDoc(img), rect), rect);
-    expect(() => m.renameZone(d, 'zone-1', 'zone-2')).toThrow(/already used/);
-    expect(() => m.renameZone(d, 'zone-1', '')).toThrow();
-    expect(m.renameZone(d, 'zone-1', 'door').zones[0].label).toBe('door');
-  });
   it('renameZoneAt renames only the zone at that index', () => {
     const d = m.addZone(m.addZone(m.createDoc(img), rect), rect);
     const dup = { ...d, zones: d.zones.map((z: any) => ({ ...z, label: 'same' })) };
@@ -105,11 +99,7 @@ describe('model', () => {
   it('updateZone refuses label patches', () => {
     const d = m.addZone(m.createDoc(img), rect);
     expect(() => m.updateZone(d, 'zone-1', { label: 'x' })).toThrow(TypeError);
-    expect(() => m.updateZone(d, 'zone-1', { label: 'x' })).toThrow(/renameZone/);
-  });
-  it('renameZone throws on an unknown label', () => {
-    const d = m.addZone(m.createDoc(img), rect);
-    expect(() => m.renameZone(d, 'nope', 'x')).toThrow(/unknown label/);
+    expect(() => m.updateZone(d, 'zone-1', { label: 'x' })).toThrow(/renameZoneAt/);
   });
   it('validate reports one message for a duplicate label via the real parseZones', () => {
     const d = m.addZone(m.createDoc(img), rect);

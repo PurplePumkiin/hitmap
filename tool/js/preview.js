@@ -23,12 +23,12 @@ export function createPreview(dialog) {
   const round = (n) => Math.round(n * 10) / 10;
 
   function render() {
-    if (map) map.destroy();
-    map = null;
-    const width = Number(range.value);
-    px.textContent = width + 'px';
-    if (!img || !doc) return;
-    img.style.width = width + 'px';
+    px.textContent = range.value + 'px';
+    if (img) img.style.width = range.value + 'px';
+  }
+
+  function start() {
+    render();
     try {
       map = createZones(img, doc, { debug: true });
     } catch (e) {
@@ -65,7 +65,7 @@ export function createPreview(dialog) {
       frame.replaceChildren(img);
       dialog.showModal();
       if (!imageUrl) return write('open an image first', 'error');
-      img.addEventListener('load', render, { once: true });
+      img.addEventListener('load', start, { once: true });
       img.addEventListener('error', () => write('image failed to load', 'error'), { once: true });
       img.src = imageUrl;
     },

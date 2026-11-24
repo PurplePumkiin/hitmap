@@ -62,12 +62,12 @@ Keyboard activation gives `point` as the zone's centre and `originalEvent` as th
 |---|---|---|
 | `image` | Source pixels, the same as in the file. | Logic and analytics that shouldn't depend on screen size. |
 | `percent` | 0 to 100 of the image's width and height. | Storing or sending a place that survives a different image size. |
-| `element` | CSS pixels from the `<img>`'s top-left corner, as rendered. | Placing a popup inside the same positioned parent as the image. |
+| `element` | CSS pixels from the `<img>`'s top-left corner, as rendered. | Placing a popup inside a positioned wrapper that holds only the image, so the wrapper's corner is the image's corner. |
 | `viewport` | CSS pixels from the viewport's top-left, like `getBoundingClientRect()`. | Placing a popup with `position: fixed`, or measuring against other elements. |
 
 To place a popup next to a zone, use `viewport` or `element`. Update it on `layout`.
 
-Scrolling moves the image on screen without changing its layout, so no `layout` event fires and `viewport` values go stale. For a `position: fixed` popup, re-read `map.zone(label).position.viewport` in a `scroll` listener (passive, on `window` or the scrolling container). Alternatively, place the popup in `element` space inside the image's positioned parent, which scrolls with the image and needs no updates.
+Scrolling moves the image on screen without changing its layout, so no `layout` event fires and `viewport` values go stale. For a `position: fixed` popup, re-read `map.zone(label).position.viewport` in a `scroll` listener (passive, on `window` or the scrolling container). Alternatively, place the popup in `element` space inside a positioned wrapper that holds only the image, so the wrapper's corner is the image's corner; it scrolls with the image and needs no updates.
 
 ```js
 map.on('click', (e) => {
