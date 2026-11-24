@@ -1,6 +1,6 @@
 // Editor entry point. Owns the doc; every change goes through a model call and then render().
 import { parseZones } from '/dist/hitzones.js';
-import { addZone, createDoc, moveZone, removeZone, renameZone, rescale, serialize, updateZone, validate } from './model.js';
+import { addZone, createDoc, moveZone, removeZone, renameZoneAt, rescale, serialize, updateZone, validate } from './model.js';
 import { createCanvas } from './canvas.js';
 import { createPanel } from './panel.js';
 import { createPreview } from './preview.js';
@@ -29,39 +29,55 @@ function render() {
   $('#empty').hidden = Boolean(doc);
 }
 
-/** Applies a model call; returns an error message instead of throwing. */
+/**
+ * Applies a model call; returns an error message instead of throwing. `nextSelected` is a
+ * label, or a function of the new doc that returns one.
+ */
 function apply(fn, nextSelected = selected) {
+  let next;
   try {
-    doc = fn(doc);
+    next = fn(doc);
   } catch (e) {
     return errText(e);
   }
-  selected = nextSelected;
+  doc = next;
+  selected = typeof nextSelected === 'function' ? nextSelected(next) : nextSelected;
   render();
   return null;
 }
+/** Shows an apply() error, if any, in the status line. */
+const report = (err) => err && status(err, 'error');
 const isUnique = (i) => doc.zones.filter((z) => z.label === doc.zones[i].label).length === 1;
+// Label-keyed model ops would hit every namesake, so a duplicated label is read-only on the
+// canvas (and can't be selected or reordered) until it is renamed in the panel.
+const isDuplicate = (label) => doc.zones.filter((z) => z.label === label).length > 1;
+const refuse = (label) => status(`Rename duplicate label "${label}" to edit it`, 'error');
 // Index-based edits, for zones whose label is not unique (only possible in a loaded file).
 const patchAt = (i, fn) => (d) => ({ ...d, zones: d.zones.map((z, j) => (j === i ? fn(z) : z)) });
 
 const canvas = createCanvas($('#canvas'), {
-  onAdd: (zone) => {
-    const next = addZone(doc, zone);
-    apply(() => next, next.zones[next.zones.length - 1].label);
+  onAdd: (zone) => report(apply((d) => addZone(d, zone), (d) => d.zones[d.zones.length - 1].label)),
+  onUpdate(label, patch) {
+    if (isDuplicate(label)) return refuse(label);
+    report(apply((d) => updateZone(d, label, patch)));
   },
-  onUpdate: (label, patch) => apply((d) => updateZone(d, label, patch)),
-  onSelect: (label) => apply((d) => d, label),
-  onRemove: (label) => apply((d) => removeZone(d, label), null),
+  onSelect(label) {
+    if (label !== null && isDuplicate(label)) {
+      refuse(label);
+      label = null;
+    }
+    apply((d) => d, label);
+  },
+  onRemove(label) {
+    if (isDuplicate(label)) return refuse(label);
+    report(apply((d) => removeZone(d, label), null));
+  },
 });
 
 const panel = createPanel($('#zones'), {
   onRename(i, to) {
     const from = doc.zones[i].label;
-    const next = selected === from ? to : selected;
-    if (isUnique(i)) return apply((d) => renameZone(d, from, to), next);
-    if (!to) return 'label must not be empty';
-    if (doc.zones.some((z, j) => j !== i && z.label === to)) return `label "${to}" is already used`;
-    return apply(patchAt(i, (z) => ({ ...z, label: to })), to);
+    return apply((d) => renameZoneAt(d, i, to), selected === from && !isDuplicate(from) ? to : selected);
   },
   onData(i, text) {
     if (!text.trim()) {
@@ -79,14 +95,19 @@ const panel = createPanel($('#zones'), {
     if (isUnique(i)) return apply((d) => updateZone(d, d.zones[i].label, { data }));
     return apply(patchAt(i, (z) => ({ ...z, data })));
   },
-  onMove: (i, delta) => apply((d) => moveZone(d, d.zones[i].label, i + delta)),
+  onMove(i, delta) {
+    const label = doc.zones[i].label;
+    if (isDuplicate(label)) return refuse(label);
+    report(apply((d) => moveZone(d, label, i + delta)));
+  },
   onRemove(i) {
     const label = doc.zones[i].label;
     const next = selected === label ? null : selected;
     if (isUnique(i)) return apply((d) => removeZone(d, label), next);
     apply((d) => ({ ...d, zones: d.zones.filter((_, j) => j !== i) }), next);
   },
-  onSelect: (label) => label !== selected && apply((d) => d, label),
+  // Focusing a duplicate's row (to rename it) leaves the selection alone.
+  onSelect: (label) => label !== selected && !isDuplicate(label) && apply((d) => d, label),
 });
 
 const preview = createPreview($('#preview'));
@@ -101,7 +122,10 @@ function offerRescale() {
 }
 bar.addEventListener('click', (e) => {
   const action = e.target instanceof HTMLElement && e.target.dataset.action;
-  if (action === 'rescale') apply((d) => rescale(d, image.width, image.height));
+  if (action === 'rescale') {
+    const err = apply((d) => rescale(d, image.width, image.height));
+    if (err) return status('Could not rescale: ' + err, 'error');
+  }
   if (action === 'rescale' || action === 'keep') bar.hidden = true;
 });
 
@@ -154,8 +178,11 @@ async function openFiles(files) {
 }
 
 async function save() {
+  // Commit a label or data field still being edited (Ctrl+S): blur fires its change/blur handler.
+  const active = document.activeElement;
+  if (active instanceof HTMLElement && active.closest('#zones') && /^(INPUT|TEXTAREA)$/.test(active.tagName)) active.blur();
   if (!doc) return status('Nothing to save yet', 'error');
-  const errors = validate(doc, parseZones);
+  const errors = [...panel.errors(), ...validate(doc, parseZones)];
   if (errors.length) return status('Not saved: ' + errors.join('; '), 'error');
   const text = serialize(doc);
   if (!session.writable) {

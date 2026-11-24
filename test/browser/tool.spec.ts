@@ -285,3 +285,75 @@ test('wheel zooms around the cursor and middle-drag pans', async ({ page }) => {
   expect(Math.abs(panned.y - after.y - 25)).toBeLessThan(1.5);
   await expect(page.locator('.zone-row')).toHaveCount(4);
 });
+
+test('duplicate labels: canvas edits are refused until one is renamed', async ({ page }) => {
+  const j = fixtureJson();
+  j.zones[1].label = 'box'; // "overlap" (60,40 60×40, drawn on top) now shares "box"
+  const t = tmp(j);
+  const s = await start({ image: t.image, json: t.json });
+  await page.goto(s.url);
+  await ready(page, 4);
+  const msg = 'Rename duplicate label "box" to edit it';
+  const dups = page.locator('.zone-row[data-label="box"]');
+  await expect(dups).toHaveCount(2);
+  for (const i of [0, 1]) {
+    await expect(dups.nth(i).locator('button[title="Bring forward"]')).toBeDisabled();
+    await expect(dups.nth(i).locator('button[title="Send backward"]')).toBeDisabled();
+  }
+  const geometry = () =>
+    page.evaluate(() => [...document.querySelectorAll('#canvas .zone')].map((n) => n.outerHTML).join(''));
+  const before = await geometry();
+
+  // Click and drag the top duplicate (only it covers 110,70), then press Delete.
+  await drag(page, [110, 70], [150, 100]);
+  await expect(page.locator('#status')).toContainText(msg);
+  await page.keyboard.press('Delete');
+  await expect(page.locator('.zone-row')).toHaveCount(4);
+  expect(await geometry()).toBe(before);
+  await expect(page.locator('#canvas .zone.selected')).toHaveCount(0);
+
+  // The first "box" row in the list is the topmost zone (index 1); rename it, then delete it.
+  const label = dups.nth(0).locator('input[name=label]');
+  await label.fill('overlap2');
+  await label.press('Enter');
+  await expect(page.locator('.zone-row[data-label="overlap2"]')).toHaveCount(1);
+  await expect(page.locator('#canvas .zone[data-label="overlap2"]')).toHaveAttribute('x', '60');
+  await clickAt(page, 110, 70);
+  await expect(page.locator('#canvas .zone.selected')).toHaveAttribute('data-label', 'overlap2');
+  await page.keyboard.press('Delete');
+  await expect(page.locator('.zone-row')).toHaveCount(3);
+  await expect(page.locator('#canvas .zone[data-label="box"]')).toHaveAttribute('x', '20');
+});
+
+test('Ctrl+S commits the field being edited before saving', async ({ page }) => {
+  const t = tmp();
+  const s = await start({ image: t.image, json: t.json });
+  await page.goto(s.url);
+  await ready(page, 4);
+  await page.locator('.zone-row[data-label="ring"] textarea[name=data]').fill('{"k":2}');
+  await page.keyboard.press('Control+s');
+  await expect(page.locator('#status')).toContainText('Saved');
+  expect(readJson(t.json).zones.find((z: any) => z.label === 'ring').data).toEqual({ k: 2 });
+
+  await page.locator('.zone-row[data-label="ring"] input[name=label]').fill('hoop');
+  await page.keyboard.press('Control+s');
+  await expect.poll(() => readJson(t.json).zones.map((z: any) => z.label)).toContain('hoop');
+});
+
+test('invalid JSON in a data field blocks Save', async ({ page }) => {
+  const t = tmp();
+  const before = fs.readFileSync(t.json, 'utf8');
+  const s = await start({ image: t.image, json: t.json });
+  let puts = 0;
+  page.on('request', (r) => r.method() === 'PUT' && puts++);
+  await page.goto(s.url);
+  await ready(page, 4);
+  await page.locator('.zone-row[data-label="ring"] textarea[name=data]').fill('{bad');
+  await page.keyboard.press('Control+s');
+  await expect(page.locator('#status')).toContainText('Not saved');
+  await expect(page.locator('#status')).toContainText('"ring"');
+  await page.click('[data-action="save"]');
+  await expect(page.locator('#status')).toContainText('not valid JSON');
+  expect(puts).toBe(0);
+  expect(fs.readFileSync(t.json, 'utf8')).toBe(before);
+});

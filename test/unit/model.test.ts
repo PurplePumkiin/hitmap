@@ -31,6 +31,17 @@ describe('model', () => {
     expect(() => m.renameZone(d, 'zone-1', '')).toThrow();
     expect(m.renameZone(d, 'zone-1', 'door').zones[0].label).toBe('door');
   });
+  it('renameZoneAt renames only the zone at that index', () => {
+    const d = m.addZone(m.addZone(m.createDoc(img), rect), rect);
+    const dup = { ...d, zones: d.zones.map((z: any) => ({ ...z, label: 'same' })) };
+    const r = m.renameZoneAt(dup, 1, 'door');
+    expect(r.zones.map((z: any) => z.label)).toEqual(['same', 'door']);
+    expect(dup.zones[1].label).toBe('same');
+    expect(() => m.renameZoneAt(dup, 0, 'same')).toThrow(/already used/);
+    expect(m.renameZoneAt(r, 1, 'door')).toEqual(r);
+    expect(() => m.renameZoneAt(dup, 0, '')).toThrow(/empty/);
+    expect(() => m.renameZoneAt(dup, 2, 'x')).toThrow(/no zone/);
+  });
   it('moveZone changes z-order', () => {
     const d = m.addZone(m.addZone(m.createDoc(img), rect), rect);
     expect(m.moveZone(d, 'zone-2', 0).zones.map((z: any) => z.label)).toEqual(['zone-2', 'zone-1']);

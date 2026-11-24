@@ -56,6 +56,14 @@ export function renameZone(doc, from, to) {
   return { ...doc, zones: doc.zones.map((z) => (z.label === from ? { ...z, label: to } : z)) };
 }
 
+/** Renames the zone at `index` only; for files whose labels are not unique yet. */
+export function renameZoneAt(doc, index, to) {
+  if (!doc.zones[index]) throw new Error(`no zone at index ${index}`);
+  if (!to) throw new Error('label must not be empty');
+  if (doc.zones.some((z, j) => j !== index && z.label === to)) throw new Error(`label "${to}" is already used`);
+  return { ...doc, zones: doc.zones.map((z, j) => (j === index ? { ...z, label: to } : z)) };
+}
+
 /** Scales geometry (not data) to a new image size and sets `image`. */
 export function rescale(doc, width, height) {
   const fx = width / doc.image.width;

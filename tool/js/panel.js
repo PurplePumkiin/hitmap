@@ -36,7 +36,7 @@ export function createPanel(list, on) {
     const li = h('li', { class: 'zone-row' },
       h('div', { class: 'head' }, h('span', { class: 'shape' }, z.shape), label, up, down, del), data, err);
     li.dataset.label = z.label;
-    const r = { li, label, data, z };
+    const r = { li, label, data, z, up, down, err };
 
     const show = (field, msg) => {
       err.textContent = msg || '';
@@ -61,6 +61,12 @@ export function createPanel(list, on) {
   }
 
   return {
+    /** Fields whose text was not applied (bad JSON, refused rename); these block Save. */
+    errors() {
+      return rows
+        .filter((r) => r.label.getAttribute('aria-invalid') === 'true' || r.data.getAttribute('aria-invalid') === 'true')
+        .map((r) => `zone "${r.z.label}": ${r.err.textContent}`);
+    },
     render(doc, selected) {
       const zones = doc ? doc.zones : [];
       const nextKey = JSON.stringify(zones.map((z) => [z.label, z.shape]));
@@ -74,6 +80,14 @@ export function createPanel(list, on) {
           if (document.activeElement !== r.data && r.data.getAttribute('aria-invalid') !== 'true') r.data.value = dataText(r.z);
         });
       }
+      // Rows for a duplicated label can't be reordered (main refuses label-keyed edits on them).
+      const counts = new Map();
+      for (const z of zones) counts.set(z.label, (counts.get(z.label) || 0) + 1);
+      rows.forEach((r, i) => {
+        const dup = counts.get(r.z.label) > 1;
+        r.up.disabled = dup || i === rows.length - 1;
+        r.down.disabled = dup || i === 0;
+      });
       for (const r of rows) {
         const sel = r.z.label === selected;
         r.li.classList.toggle('selected', sel);
