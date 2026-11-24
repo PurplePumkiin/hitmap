@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   computeLayout, contentBox, pointFromClient, pointFromImage, positionOf, resolvePosition,
-  zoneBounds, type ElementMetrics,
+  splitPosition, zoneBounds, type ElementMetrics,
 } from '../../src/geometry';
 
 const z = { top: 0, right: 0, bottom: 0, left: 0 };
@@ -40,6 +40,32 @@ describe('resolvePosition', () => {
     expect(resolvePosition('50%', 100)).toBe(50);
     expect(resolvePosition('20px', 100)).toBe(20);
     expect(resolvePosition('calc(10px)', 100)).toBe(50);
+  });
+  it('resolves calc(% ± px) in either term order', () => {
+    expect(resolvePosition('calc(100% - 10px)', 200)).toBe(190);
+    expect(resolvePosition('calc(50% + 4px)', 200)).toBe(104);
+    expect(resolvePosition('calc(-10px + 100%)', 200)).toBe(190);
+    expect(resolvePosition('calc(4px + 50%)', 200)).toBe(104);
+    expect(resolvePosition('calc(10px - 100%)', 200)).toBe(-190);
+    expect(resolvePosition('calc(100%-10px)', 200)).toBe(100); // not valid CSS: falls back to centre
+    expect(resolvePosition('calc(100% - 10px)', -100)).toBe(-110); // negative free space (cover)
+  });
+});
+
+describe('splitPosition', () => {
+  it('splits on top-level whitespace only', () => {
+    expect(splitPosition('50% 50%')).toEqual(['50%', '50%']);
+    expect(splitPosition('calc(100% - 10px) calc(100% - 10px)')).toEqual(['calc(100% - 10px)', 'calc(100% - 10px)']);
+    expect(splitPosition('10px calc(50% + 2px)')).toEqual(['10px', 'calc(50% + 2px)']);
+    expect(splitPosition('  0%   100%  ')).toEqual(['0%', '100%']);
+  });
+  it('falls back to centre for missing tokens', () => {
+    expect(splitPosition('')).toEqual(['50%', '50%']);
+    expect(splitPosition('25%')).toEqual(['25%', '50%']);
+  });
+  it('feeds contentBox for right 10px bottom 10px', () => {
+    const b = contentBox(el({ fit: 'cover', position: splitPosition('calc(100% - 10px) calc(100% - 10px)') }));
+    expect([b.x, b.y]).toEqual([-210, -10]);
   });
 });
 

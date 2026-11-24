@@ -19,11 +19,40 @@ export type Layout = {
   scale: number;
 };
 
+/** Splits a computed `object-position` into its two tokens, keeping `calc( … )` whole. */
+export function splitPosition(value: string): [string, string] {
+  const out: string[] = [];
+  let depth = 0;
+  let cur = '';
+  for (const ch of value) {
+    if (ch === '(') depth++;
+    else if (ch === ')') depth = Math.max(0, depth - 1);
+    if (!depth && /\s/.test(ch)) {
+      if (cur) out.push(cur);
+      cur = '';
+    } else cur += ch;
+  }
+  if (cur) out.push(cur);
+  return [out[0] || '50%', out[1] || '50%'];
+}
+
+const NUM = '-?(?:\\d+\\.?\\d*|\\.\\d+)(?:e[+-]?\\d+)?';
+const PCT = new RegExp(`^${NUM}%$`);
+const PX = new RegExp(`^${NUM}px$`, 'i');
+const CALC = new RegExp(`^calc\\(\\s*(${NUM})(%|px)\\s+([+-])\\s+(${NUM})(%|px)\\s*\\)$`, 'i');
+
+/** Resolves one `object-position` token: `P%`, `Npx`, or `calc(P% ± Npx)` in either order. Anything else centres. */
 export function resolvePosition(token: string, free: number): number {
   const t = token.trim();
-  const n = parseFloat(t);
-  if (/^-?[\d.]+%$/.test(t)) return (free * n) / 100;
-  if (/^-?[\d.]+px$/.test(t)) return n;
+  if (PCT.test(t)) return (free * parseFloat(t)) / 100;
+  if (PX.test(t)) return parseFloat(t);
+  const c = CALC.exec(t);
+  if (c && c[2].toLowerCase() !== c[5].toLowerCase()) {
+    const term = (v: string, unit: string) => (unit === '%' ? (free * parseFloat(v)) / 100 : parseFloat(v));
+    const a = term(c[1], c[2]);
+    const b = term(c[4], c[5]);
+    return c[3] === '+' ? a + b : a - b;
+  }
   return free / 2;
 }
 

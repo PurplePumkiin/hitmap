@@ -94,6 +94,15 @@ test('object-fit: cover crops; viewBox matches the visible source rect', async (
   expect(r.viewBox).toBe('100 0 200 200');
 });
 
+test('object-position right 10px bottom 10px (computed as calc) aligns under cover', async ({ page }) => {
+  await setup(page, { img: 'display:block;width:200px;height:200px;object-fit:cover;object-position:right 10px bottom 10px' });
+  await nextLayout(page, 0);
+  const r = await rects(page);
+  // Content is 400×200 at (-210, -10); the visible 190×190 starts at source (210, 10).
+  near(r.svg, { x: r.img.x, y: r.img.y, width: 190, height: 190 });
+  expect(r.viewBox).toBe('210 10 190 190');
+});
+
 test('contain letterboxes; svg excludes the bars', async ({ page }) => {
   await setup(page, { img: 'display:block;width:400px;height:400px;object-fit:contain' });
   await nextLayout(page, 0);

@@ -1,4 +1,4 @@
-import type { ElementMetrics, Sides } from './geometry.js';
+import { splitPosition, type ElementMetrics, type Sides } from './geometry.js';
 import type { XY } from './types.js';
 
 /** `offset`: the img's border-box corner in its containing block's padding-box coordinates (CSS px, untransformed). */
@@ -19,7 +19,6 @@ export function measure(img: HTMLImageElement, cb: Element | null = img.parentEl
   if (!img.naturalWidth || !img.offsetWidth) return null;
   const cs = getComputedStyle(img);
   const fit = cs.objectFit;
-  const pos = (cs.objectPosition || '50% 50%').split(/\s+/);
   const border = sides(cs, 'border', '-width');
   const padding = sides(cs, 'padding');
   const extra = cs.boxSizing === 'border-box' ? [0, 0] : [
@@ -43,7 +42,7 @@ export function measure(img: HTMLImageElement, cb: Element | null = img.parentEl
       padding,
       natural: { width: img.naturalWidth, height: img.naturalHeight },
       fit: (FITS.indexOf(fit) >= 0 ? fit : 'fill') as ElementMetrics['fit'],
-      position: [pos[0] || '50%', pos[1] || '50%'],
+      position: splitPosition(cs.objectPosition || ''),
     },
     origin: { x: rect.left, y: rect.top },
     scale,
