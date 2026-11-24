@@ -1,18 +1,16 @@
 name: ci
 on:
   push:
+    branches: [main, build]
   pull_request:
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node: [18, 22]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node }}
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run build
@@ -20,3 +18,14 @@ jobs:
       - run: npm test
       - run: npx playwright install --with-deps
       - run: npm run test:browser
+  node18:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: node --input-type=module -e "const m = await import('./dist/hitzones.js'); if (typeof m.createZones !== 'function') process.exit(1)"
