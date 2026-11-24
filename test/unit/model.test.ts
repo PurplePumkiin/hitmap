@@ -86,4 +86,27 @@ describe('model', () => {
     expect(s).toContain('"custom"');
     expect(s).toContain('"note"');
   });
+  it('addZone rejects a duplicate explicit label, auto-labels an empty one', () => {
+    const d = m.addZone(m.createDoc(img), { ...rect, label: 'door' });
+    expect(() => m.addZone(d, { ...rect, label: 'door' })).toThrow(/already used/);
+    expect(m.addZone(d, { ...rect, label: '' }).zones[1].label).toBe('zone-1');
+  });
+  it('updateZone refuses label patches', () => {
+    const d = m.addZone(m.createDoc(img), rect);
+    expect(() => m.updateZone(d, 'zone-1', { label: 'x' })).toThrow(TypeError);
+    expect(() => m.updateZone(d, 'zone-1', { label: 'x' })).toThrow(/renameZone/);
+  });
+  it('renameZone throws on an unknown label', () => {
+    const d = m.addZone(m.createDoc(img), rect);
+    expect(() => m.renameZone(d, 'nope', 'x')).toThrow(/unknown label/);
+  });
+  it('validate reports one message for a duplicate label via the real parseZones', () => {
+    const d = m.addZone(m.createDoc(img), rect);
+    const dup = { ...d, zones: [d.zones[0], { ...d.zones[0] }] };
+    expect(() => parseZones(dup)).toThrow(/duplicate label/);
+    expect(m.validate(dup, parseZones)).toHaveLength(1);
+    const empty = { ...d, zones: [{ ...d.zones[0], label: '' }] };
+    expect(() => parseZones(empty)).toThrow(/non-empty label/);
+    expect(m.validate(empty, parseZones)).toHaveLength(1);
+  });
 });

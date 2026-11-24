@@ -22,6 +22,7 @@ export function createDoc(image) {
 export function addZone(doc, zone) {
   const used = new Set(doc.zones.map((z) => z.label));
   let label = zone.label;
+  if (label && used.has(label)) throw new Error(`label "${label}" is already used`);
   if (!label) {
     let n = 1;
     while (used.has('zone-' + n)) n++;
@@ -31,6 +32,7 @@ export function addZone(doc, zone) {
 }
 
 export function updateZone(doc, label, patch) {
+  if (patch && 'label' in patch) throw new TypeError('updateZone cannot change the label; use renameZone');
   return { ...doc, zones: doc.zones.map((z) => (z.label === label ? { ...z, ...clone(patch) } : z)) };
 }
 
@@ -48,9 +50,10 @@ export function moveZone(doc, label, toIndex) {
 }
 
 export function renameZone(doc, from, to) {
+  if (!doc.zones.some((z) => z.label === from)) throw new Error(`unknown label "${from}"`);
   if (!to) throw new Error('label must not be empty');
   if (to !== from && doc.zones.some((z) => z.label === to)) throw new Error(`label "${to}" is already used`);
-  return updateZone(doc, from, { label: to });
+  return { ...doc, zones: doc.zones.map((z) => (z.label === from ? { ...z, label: to } : z)) };
 }
 
 /** Scales geometry (not data) to a new image size and sets `image`. */
@@ -95,6 +98,9 @@ export function validate(doc, parse) {
     parse(doc);
   } catch (e) {
     const msg = e && e.message ? e.message : String(e);
+    // Depends on parseZones wording in src/parse.ts: 'zones[i] needs a non-empty label'
+    // and 'duplicate label "x" (zones[i])'. The validate test with the real parseZones
+    // fails if either message changes.
     const labelIssue = /non-empty label|duplicate label/.test(msg);
     if (!(labelIssue && errors.length)) errors.push(msg);
   }
