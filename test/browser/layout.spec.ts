@@ -384,3 +384,66 @@ test('createZones throws TypeError on invalid JSON', async ({ page }) => {
   expect(msg).toBe('TypeError');
   expect(await page.evaluate(() => document.querySelectorAll('svg').length)).toBe(0);
 });
+
+// The rect of the img's content box (border-box minus border and padding), in viewport px.
+function contentRect(page: Page) {
+  return page.evaluate(() => {
+    const img = document.getElementById('img')!;
+    const svg = document.querySelector('svg.hitzones')!;
+    const b = img.getBoundingClientRect();
+    const cs = getComputedStyle(img);
+    const n = (p: string) => parseFloat(cs.getPropertyValue(p)) || 0;
+    const l = n('border-left-width') + n('padding-left');
+    const t = n('border-top-width') + n('padding-top');
+    const r = n('border-right-width') + n('padding-right');
+    const bt = n('border-bottom-width') + n('padding-bottom');
+    const s = svg.getBoundingClientRect();
+    return {
+      content: { x: b.left + l, y: b.top + t, width: b.width - l - r, height: b.height - t - bt },
+      svg: { x: s.left, y: s.top, width: s.width, height: s.height },
+    };
+  });
+}
+
+test('svg follows when content above the image grows', async ({ page }) => {
+  await setup(page, { wrap: 'width:400px', img: 'display:block;width:100%', wait: true });
+  await nextLayout(page, 0);
+  await page.evaluate(() => {
+    const block = document.createElement('div');
+    block.style.height = '50px';
+    document.getElementById('wrap')!.prepend(block);
+  });
+  await frames(page);
+  const r = await contentRect(page);
+  near(r.svg, r.content, 0.5);
+});
+
+test('svg follows a margin change on the img', async ({ page }) => {
+  await setup(page, { wrap: 'width:600px', img: 'display:block;width:400px', wait: true });
+  await nextLayout(page, 0);
+  await page.evaluate(() => (document.getElementById('img')!.style.margin = '23px 0 0 41px'));
+  await frames(page);
+  const r = await contentRect(page);
+  near(r.svg, r.content, 0.5);
+});
+
+test('fractional width (33.3%) stays aligned within 0.5px', async ({ page }) => {
+  await setup(page, {
+    wrap: 'width:1000px;padding-left:7.3px',
+    img: 'display:block;width:33.3%;margin-left:10.4px;padding:3.3px;border:1.7px solid #000',
+    wait: true,
+  });
+  await nextLayout(page, 0);
+  const r = await contentRect(page);
+  near(r.svg, r.content, 0.5);
+});
+
+test('no layout event when nothing changed', async ({ page }) => {
+  await setup(page, { wrap: 'width:400px', img: 'display:block;width:100%', wait: true });
+  await nextLayout(page, 0);
+  await frames(page);
+  const before = await layouts(page);
+  await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+  await frames(page, 4);
+  expect(await layouts(page)).toBe(before);
+});

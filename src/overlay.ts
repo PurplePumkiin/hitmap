@@ -1,12 +1,13 @@
 import type { Layout } from './geometry';
-import type { Options, ZonesJSON } from './types';
+import type { Options, XY, ZonesJSON } from './types';
 
 const NS = 'http://www.w3.org/2000/svg';
 
 export type Overlay = {
   svg: SVGSVGElement;
   shapes: Map<string, SVGElement>;
-  apply(L: Layout): void;
+  /** Places the SVG; `offset` is the img's border-box corner in the containing block. */
+  apply(L: Layout, offset: XY): void;
   hide(): void;
   remove(): void;
 };
@@ -44,10 +45,10 @@ export function createOverlay(img: HTMLImageElement, json: ZonesJSON, opts: Requ
   return {
     svg,
     shapes,
-    apply(L) {
+    apply(L, offset) {
       const { style } = svg;
-      style.left = `${img.offsetLeft + L.visible.x}px`;
-      style.top = `${img.offsetTop + L.visible.y}px`;
+      style.left = `${offset.x + L.visible.x}px`;
+      style.top = `${offset.y + L.visible.y}px`;
       style.width = `${L.visible.width}px`;
       style.height = `${L.visible.height}px`;
       style.display = '';

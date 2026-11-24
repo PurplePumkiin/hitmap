@@ -40,10 +40,12 @@ export function createZones(img: HTMLImageElement, json: unknown, options: Optio
   const oldPosition = parent && getComputedStyle(parent).position === 'static' ? parent.style.position : null;
   if (parent && oldPosition !== null) parent.style.position = 'relative';
 
-  const current = (): Layout | null => {
-    const m = measure(img);
-    return m && computeLayout(m.metrics, data.image, m.origin, m.scale);
+  const measured = () => {
+    const m = measure(img, parent);
+    const L = m && computeLayout(m.metrics, data.image, m.origin, m.scale);
+    return L && { L, offset: m.offset };
   };
+  const current = (): Layout | null => measured()?.L ?? null;
 
   const warned = new Set<string>();
   const checkAspect = () => {
@@ -58,12 +60,24 @@ export function createZones(img: HTMLImageElement, json: unknown, options: Optio
     }
   };
 
+  // Places the SVG from a fresh measurement. Emits `layout` only when the placement changed.
+  let last = '';
+  const realign = () => {
+    const r = measured();
+    if (!r) {
+      last = '';
+      return overlay.hide();
+    }
+    const { L, offset } = r;
+    const key = [L.visible, L.source, offset].map((b) => Object.values(b).join()).join('|');
+    if (key === last) return;
+    last = key;
+    overlay.apply(L, offset);
+    emitter.emit('layout', { zones: data.zones.map((z) => ({ label: z.label, position: zonePosition(z, L) })) });
+  };
   const layout = () => {
     frame = 0;
-    const L = current();
-    if (!L) return overlay.hide();
-    overlay.apply(L);
-    emitter.emit('layout', { zones: data.zones.map((z) => ({ label: z.label, position: zonePosition(z, L) })) });
+    realign();
   };
   let frame = 0;
   const schedule = () => {
@@ -74,8 +88,20 @@ export function createZones(img: HTMLImageElement, json: unknown, options: Optio
     schedule();
   };
 
+  // Size changes (img border box, parent), moves within the parent (siblings, img style), font reflow.
   const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(schedule) : null;
-  ro?.observe(img);
+  ro?.observe(img, { box: 'border-box' });
+  if (parent) ro?.observe(parent);
+  const mo = typeof MutationObserver === 'function' ? new MutationObserver(schedule) : null;
+  mo?.observe(img, { attributes: true, attributeFilter: ['style', 'class'] });
+  if (parent) mo?.observe(parent, { childList: true });
+  const fonts = (document as Document & { fonts?: EventTarget }).fonts;
+  fonts?.addEventListener?.('loadingdone', schedule);
+  // Cheap re-check before any interaction, so a move nothing reported corrects itself.
+  // Capture phase: runs before Task 4's hit resolution.
+  const onDown = () => realign();
+  img.addEventListener('pointerdown', onDown, true);
+  overlay.svg.addEventListener('pointerdown', onDown, true);
   img.addEventListener('load', onLoad);
   window.addEventListener('resize', schedule);
   if (img.complete && img.naturalWidth) onLoad();
@@ -95,6 +121,10 @@ export function createZones(img: HTMLImageElement, json: unknown, options: Optio
       if (destroyed) return;
       destroyed = true;
       ro?.disconnect();
+      mo?.disconnect();
+      fonts?.removeEventListener?.('loadingdone', schedule);
+      img.removeEventListener('pointerdown', onDown, true);
+      overlay.svg.removeEventListener('pointerdown', onDown, true);
       img.removeEventListener('load', onLoad);
       window.removeEventListener('resize', schedule);
       if (frame) cancelAnimationFrame(frame);
