@@ -146,6 +146,47 @@ test('an already positioned parent is left alone', async ({ page }) => {
   expect(await page.evaluate(() => document.getElementById('wrap')!.style.position)).toBe('absolute');
 });
 
+test('destroying one map leaves another image in the same static parent aligned', async ({ page }) => {
+  await setup(page, { create: false });
+  const gap = await page.evaluate(async () => {
+    const w = window as any;
+    // The padded, positioned outer div shows a wrong containing block if the parent goes static.
+    document.getElementById('root')!.innerHTML =
+      '<div style="position:relative;padding:37px"><div id="wrap"><img id="a" style="display:block;width:200px"><img id="b" style="display:block;width:200px"></div></div>';
+    const [a, b] = ['a', 'b'].map((id) => document.getElementById(id) as HTMLImageElement);
+    await Promise.all([a, b].map((img) => new Promise((r) => {
+      img.addEventListener('load', r, { once: true });
+      img.src = '/test/fixtures/scene.svg';
+    })));
+    const A = w.Hitzones.createZones(a, w.json);
+    w.Hitzones.createZones(b, w.json);
+    A.destroy();
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const s = b.nextElementSibling!.getBoundingClientRect();
+    const i = b.getBoundingClientRect();
+    return Math.max(Math.abs(s.left - i.left), Math.abs(s.top - i.top), Math.abs(s.width - i.width), Math.abs(s.height - i.height));
+  });
+  expect(gap).toBeLessThanOrEqual(0.5);
+});
+
+test('createZones throws TypeError for an img with no parent element (directly in a shadow root)', async ({ page }) => {
+  await setup(page, { create: false });
+  const out = await page.evaluate(() => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = host.attachShadow({ mode: 'open' });
+    const img = document.createElement('img');
+    root.append(img);
+    try {
+      (window as any).Hitzones.createZones(img, (window as any).json);
+      return 'no throw';
+    } catch (e) {
+      return `${e instanceof TypeError} ${(e as Error).message} ${root.querySelectorAll('svg').length}`;
+    }
+  });
+  expect(out).toBe('true hitzones: the img needs a parent element 0');
+});
+
 test('layout fires once per frame on resize with every zone position', async ({ page }) => {
   await setup(page, { wrap: 'width:400px', img: 'display:block;width:100%' });
   await nextLayout(page, 0);

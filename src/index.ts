@@ -25,7 +25,12 @@ function zonePosition(z: Zone, L: Layout): Position {
   return p;
 }
 
+// Maps per parent, so the parent's `position` is restored only when the last one goes.
+const parents = new WeakMap<Element, { n: number; old: string }>();
+
 export function createZones(img: HTMLImageElement, json: unknown, options: Options = {}): Hitzones {
+  const parent = img.parentElement;
+  if (!parent) throw new TypeError('hitzones: the img needs a parent element');
   const data = parseZones(json);
   const opts: Required<Options> = { keyboard: false, cursor: 'pointer', className: 'hitzones', debug: false };
   // Only defined keys override a default: `{ className: undefined }` keeps 'hitzones'.
@@ -37,9 +42,12 @@ export function createZones(img: HTMLImageElement, json: unknown, options: Optio
   const reset = () => data.zones.forEach((z) => status.set(z.label, { status: 'idle', clicks: 0 }));
   reset();
 
-  const parent = img.parentElement;
-  const oldPosition = parent && getComputedStyle(parent).position === 'static' ? parent.style.position : null;
-  if (parent && oldPosition !== null) parent.style.position = 'relative';
+  let shared = parents.get(parent);
+  if (shared) shared.n++;
+  else if (getComputedStyle(parent).position === 'static') {
+    parents.set(parent, (shared = { n: 1, old: parent.style.position }));
+    parent.style.position = 'relative';
+  }
 
   const measured = () => {
     const m = measure(img, parent);
@@ -94,14 +102,13 @@ export function createZones(img: HTMLImageElement, json: unknown, options: Optio
   };
 
   // Size changes (img border box, parent), moves within the parent (siblings, img style), font reflow.
-  const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(schedule) : null;
-  ro?.observe(img, { box: 'border-box' });
-  if (parent) ro?.observe(parent);
-  const mo = typeof MutationObserver === 'function' ? new MutationObserver(schedule) : null;
-  mo?.observe(img, { attributes: true, attributeFilter: ['style', 'class'] });
-  if (parent) mo?.observe(parent, { childList: true });
-  const fonts = (document as Document & { fonts?: EventTarget }).fonts;
-  fonts?.addEventListener?.('loadingdone', schedule);
+  const ro = new ResizeObserver(schedule);
+  ro.observe(img, { box: 'border-box' });
+  ro.observe(parent);
+  const mo = new MutationObserver(schedule);
+  mo.observe(img, { attributes: true, attributeFilter: ['style', 'class'] });
+  mo.observe(parent, { childList: true });
+  document.fonts.addEventListener('loadingdone', schedule);
   const hit = (label: string, L: Layout, point: Point, originalEvent: Event) => {
     const z = zones.get(label)!;
     const s = { status: 'clicked' as const, clicks: status.get(label)!.clicks + 1 };
@@ -185,9 +192,9 @@ export function createZones(img: HTMLImageElement, json: unknown, options: Optio
     destroy() {
       if (destroyed) return;
       destroyed = true;
-      ro?.disconnect();
-      mo?.disconnect();
-      fonts?.removeEventListener?.('loadingdone', schedule);
+      ro.disconnect();
+      mo.disconnect();
+      document.fonts.removeEventListener('loadingdone', schedule);
       for (const t of [img, overlay.svg]) for (const [type, fn, capture] of pointer) t.removeEventListener(type, fn, capture);
       overlay.svg.removeEventListener('keydown', onKey);
       downs.clear();
@@ -195,7 +202,10 @@ export function createZones(img: HTMLImageElement, json: unknown, options: Optio
       window.removeEventListener('resize', schedule);
       if (frame) cancelAnimationFrame(frame);
       overlay.remove();
-      if (parent && oldPosition !== null) parent.style.position = oldPosition;
+      if (shared && !--shared.n) {
+        parent.style.position = shared.old;
+        parents.delete(parent);
+      }
       emitter.clear();
     },
   };

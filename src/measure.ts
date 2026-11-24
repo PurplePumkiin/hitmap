@@ -15,7 +15,7 @@ function sides(cs: CSSStyleDeclaration, prefix: string, suffix = ''): Sides {
  * Reads the image's rendered box. Null until it has loaded and is rendered.
  * Sizes come from computed styles (sub-pixel exact), not the rounded offsetWidth/Height.
  */
-export function measure(img: HTMLImageElement, cb: Element | null = img.parentElement): Measured | null {
+export function measure(img: HTMLImageElement, cb: Element): Measured | null {
   if (!img.naturalWidth || !img.offsetWidth) return null;
   const cs = getComputedStyle(img);
   const fit = cs.objectFit;
@@ -29,11 +29,11 @@ export function measure(img: HTMLImageElement, cb: Element | null = img.parentEl
   const height = (parseFloat(cs.height) || img.offsetHeight - extra[1]) + extra[1];
   const rect = img.getBoundingClientRect();
   const scale = rect.width / width;
-  const c = cb ? cb.getBoundingClientRect() : { left: 0, top: 0 };
+  const c = cb.getBoundingClientRect();
   return {
     offset: {
-      x: (rect.left - c.left) / scale - (cb ? cb.clientLeft - cb.scrollLeft : 0),
-      y: (rect.top - c.top) / scale - (cb ? cb.clientTop - cb.scrollTop : 0),
+      x: (rect.left - c.left) / scale - (cb.clientLeft - cb.scrollLeft),
+      y: (rect.top - c.top) / scale - (cb.clientTop - cb.scrollTop),
     },
     metrics: {
       width,

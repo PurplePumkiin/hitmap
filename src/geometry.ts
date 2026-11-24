@@ -21,19 +21,8 @@ export type Layout = {
 
 /** Splits a computed `object-position` into its two tokens, keeping `calc( … )` whole. */
 export function splitPosition(value: string): [string, string] {
-  const out: string[] = [];
-  let depth = 0;
-  let cur = '';
-  for (const ch of value) {
-    if (ch === '(') depth++;
-    else if (ch === ')') depth = Math.max(0, depth - 1);
-    if (!depth && /\s/.test(ch)) {
-      if (cur) out.push(cur);
-      cur = '';
-    } else cur += ch;
-  }
-  if (cur) out.push(cur);
-  return [out[0] || '50%', out[1] || '50%'];
+  const [a = '50%', b = '50%'] = value.match(/calc\([^)]*\)|\S+/g) || [];
+  return [a, b];
 }
 
 const NUM = '-?(?:\\d+\\.?\\d*|\\.\\d+)(?:e[+-]?\\d+)?';

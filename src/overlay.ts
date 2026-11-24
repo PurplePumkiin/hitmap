@@ -5,7 +5,6 @@ const NS = 'http://www.w3.org/2000/svg';
 
 export type Overlay = {
   svg: SVGSVGElement;
-  shapes: Map<string, SVGElement>;
   /** Places the SVG; `offset` is the img's border-box corner in the containing block. */
   apply(L: Layout, offset: XY): void;
   hide(): void;
@@ -25,7 +24,6 @@ export function createOverlay(img: HTMLImageElement, json: ZonesJSON, opts: Requ
     ...(opts.keyboard ? {} : { 'aria-hidden': 'true' }),
     style: 'position:absolute;pointer-events:none;overflow:hidden;margin:0;max-width:none;display:none',
   });
-  const shapes = new Map<string, SVGElement>();
   const stroke = opts.debug ? 'stroke:magenta;stroke-width:2;vector-effect:non-scaling-stroke;' : '';
   for (const z of json.zones) {
     const attrs: Record<string, string | number> =
@@ -44,14 +42,12 @@ export function createOverlay(img: HTMLImageElement, json: ZonesJSON, opts: Requ
       s.setAttribute('role', 'button');
       s.setAttribute('aria-label', typeof aria === 'string' && aria ? aria : z.label);
     }
-    shapes.set(z.label, s);
     svg.appendChild(s);
   }
   img.after(svg);
 
   return {
     svg,
-    shapes,
     apply(L, offset) {
       const { style } = svg;
       style.left = `${offset.x + L.visible.x}px`;

@@ -15,7 +15,7 @@ import { createZones, parseZones } from 'hitzones';
 const map = createZones(document.querySelector('#scene'), zonesJson, options);
 ```
 
-`createZones(img, json, options?)` returns at once. It throws a `TypeError` if the JSON isn't a valid v1 file (see [format.md](format.md)). Layout waits until the image has loaded and has a visible, non-zero size. An image that is already loaded is laid out straight away.
+`createZones(img, json, options?)` returns at once. It throws a `TypeError` if the JSON isn't a valid v1 file (see [format.md](format.md)). It also throws if the `<img>` has no parent element (for example, one placed directly in a shadow root); wrap it in an element. Layout waits until the image has loaded and has a visible, non-zero size. An image that is already loaded is laid out straight away.
 
 | Method | Does |
 |---|---|
