@@ -1,4 +1,4 @@
-# hitmap — design
+# hitzones — design
 
 Status: approved, 2026-11-23.
 
@@ -6,14 +6,14 @@ Status: approved, 2026-11-23.
 
 Interactive images like hidden-object scenes ("Where's Waldo"), annotated diagrams and shoppable photos all need the same base: invisible click zones on a flat image that stay locked to the right part of the picture at every screen size. What each page *does* with a click varies every time (a popup, a counter, an analytics event, a sound).
 
-hitmap is that base and nothing else. It has two parts:
+hitzones is that base and nothing else. It has two parts:
 
 1. **The package**: a tiny, dependency-free JavaScript library. It attaches to an `<img>`, lays invisible zones over it, and reports what happened (which zone, its status, and where that zone is on screen right now). It draws nothing visible.
-2. **The tool**: a local editor you run with `npm run tool` (or `npx hitmap edit`). You open an image, draw zones, name them, attach data, and save a JSON file. It never ships to production.
+2. **The tool**: a local editor you run with `npm run tool` (or `npx hitzones edit`). You open an image, draw zones, name them, attach data, and save a JSON file. It never ships to production.
 
 The JSON format joins the two, and the format is the real product. It is documented and versioned so other tools can read or write it.
 
-It will be open source under the author's GitHub account (`PurplePumkiin/hitmap`) and published to npm as `hitmap`.
+It will be open source under the author's GitHub account (`PurplePumkiin/hitzones`) and published to npm as `hitzones`.
 
 ## Goals
 
@@ -27,7 +27,7 @@ It will be open source under the author's GitHub account (`PurplePumkiin/hitmap`
 
 - Rendering popups, tooltips, highlights, markers or any visible UI.
 - Game logic: counters, "all found", scoring, timers. Pages build these from events and `state()`.
-- Panning or zooming the image. The page owns its layout, and hitmap follows whatever happens to the image.
+- Panning or zooming the image. The page owns its layout, and hitzones follows whatever happens to the image.
 - Framework wrappers (React, Vue, etc.). Possible later, as separate thin packages.
 - Hosting, storage, accounts or a production editor.
 
@@ -53,14 +53,14 @@ It will be open source under the author's GitHub account (`PurplePumkiin/hitmap`
 - Each zone carries free-form `data` that is passed through untouched.
 - Clicks that hit no zone are reported (`miss`).
 - No automatic minimum tap size. If a target should be bigger, draw it bigger.
-- Name `hitmap` (free on npm and on GitHub as of 2026-11-23). Public repo under `PurplePumkiin`.
+- Name `hitzones`, published to npm as a 0.0.1 placeholder on 2026-11-24 to hold the name. (`hitmap` was refused by npm as too similar to the existing `hit-map`.) Public repo `PurplePumkiin/hitzones`.
 - **Nothing is committed until the README and license are agreed with the author.** The license is undecided (MIT or Apache-2.0).
 
-## The data format (`hitmap` v1)
+## The data format (`hitzones` v1)
 
 ```json
 {
-  "hitmap": 1,
+  "hitzones": 1,
   "image": { "width": 3840, "height": 2160, "src": "scene.jpg" },
   "zones": [
     {
@@ -83,7 +83,7 @@ It will be open source under the author's GitHub account (`PurplePumkiin/hitmap`
 }
 ```
 
-- `hitmap`: the format version (integer). Readers reject versions they don't know.
+- `hitzones`: the format version (integer). Readers reject versions they don't know.
 - `image.width` / `image.height`: the pixel size of the art the zones were drawn on. Required.
 - `image.src`: informational only (the file name the tool saw). The package never loads it.
 - `zones[].label`: required and unique within the file. It is the zone's identity in every event.
@@ -91,17 +91,17 @@ It will be open source under the author's GitHub account (`PurplePumkiin/hitmap`
 - `zones[].data`: optional, any JSON value, returned as-is.
 - Zone order is z-order: later zones sit on top where zones overlap.
 - Unknown top-level and zone keys are preserved by the tool and ignored by the package. This leaves room to extend the format.
-- A JSON Schema file ships in the package (`schema/hitmap-v1.json`).
+- A JSON Schema file ships in the package (`schema/hitzones-v1.json`).
 
 ## The package
 
 ### Use
 
 ```js
-import { createHitmap } from 'hitmap';
-// or: <script src="hitmap.iife.js"></script> → window.Hitmap.createHitmap
+import { createZones } from 'hitzones';
+// or: <script src="hitzones.iife.js"></script> → window.Hitzones.createZones
 
-const map = createHitmap(document.querySelector('#scene'), zonesJson, options);
+const map = createZones(document.querySelector('#scene'), zonesJson, options);
 
 const off = map.on('click', e => { … });   // on() returns an unsubscribe function
 map.on('miss', e => { … });
@@ -117,7 +117,7 @@ map.destroy();   // remove the overlay and all listeners
 
 - It inserts one absolutely positioned `<svg>` as the image's next sibling and keeps it exactly over the image's **rendered content box**. The SVG `viewBox` is `0 0 image.width image.height`, so zones are drawn in source pixels and the browser scales them with the image. No JavaScript recalculates zone geometry.
 - The content box accounts for `object-fit` (`fill`, `contain`, `cover`, `none`, `scale-down`) and `object-position`. Cropped art (`cover`) still maps correctly, and zones that fall outside the visible crop are simply clipped. It also accounts for padding and border on the `<img>`.
-- If the image's parent is statically positioned, hitmap sets `position: relative` on it and restores it on `destroy()`. This is the only style it touches outside its own SVG. The SVG is `pointer-events: none` except on its zone shapes.
+- If the image's parent is statically positioned, hitzones sets `position: relative` on it and restores it on `destroy()`. This is the only style it touches outside its own SVG. The SVG is `pointer-events: none` except on its zone shapes.
 - A `ResizeObserver` (on the image), plus a listener for the image's `load`, keep the overlay aligned and trigger `layout`. CSS transforms on ancestors need nothing extra, because the SVG sits in the same transformed context as the image.
 - If the image's natural aspect ratio differs from `image.width / image.height` by more than 1%, it warns once in the console (the art was probably swapped).
 
@@ -146,16 +146,16 @@ The box is the zone's bounding box. Polygons and ellipses also get `shape` (the 
 |---|---|---|
 | `keyboard` | `false` | `true` makes zones focusable (`tabindex=0`, `role="button"`, `aria-label` from `data.ariaLabel` or else `label`), activated with Enter or Space. Off by default because tabbing through zones gives away a hidden-object game. Pages that need it opt in. |
 | `cursor` | `'pointer'` | Cursor over zones. Use `'default'` to avoid giving zones away on hover. |
-| `className` | `'hitmap'` | Class on the SVG. Zones get `hitmap-zone` and `data-label`, so pages can style or debug them. |
+| `className` | `'hitzones'` | Class on the SVG. Zones get `hitzone` and `data-label`, so pages can style or debug them. |
 | `debug` | `false` | Outlines the zones (for checking alignment during development). |
 
 ### Accessibility note (for the README)
 
-hitmap reports clicks. It doesn't decide how a game is made accessible. The README will show the `keyboard` option, and how to offer a non-visual alternative such as a list of zones.
+hitzones reports clicks. It doesn't decide how a game is made accessible. The README will show the `keyboard` option, and how to offer a non-visual alternative such as a list of zones.
 
 ### Build and distribution
 
-- Source in TypeScript, built with esbuild to ESM (`dist/hitmap.js`), an IIFE (`dist/hitmap.iife.js`, global `Hitmap`) and type declarations. Dev dependencies only.
+- Source in TypeScript, built with esbuild to ESM (`dist/hitzones.js`), an IIFE (`dist/hitzones.iife.js`, global `Hitzones`) and type declarations. Dev dependencies only.
 - Supports current evergreen browsers (needs `ResizeObserver` and pointer events).
 
 ### Details settled during review (builder's calls, open to correction)
@@ -163,14 +163,14 @@ hitmap reports clicks. It doesn't decide how a game is made accessible. The READ
 - **Where clicks are caught.** The SVG root is `pointer-events: none`, and zone shapes are `pointer-events: all` with a transparent fill. Zone clicks are caught on the SVG, and misses on the `<img>` (clicks in empty areas pass through the SVG to the image). Drag detection tracks pointerdown/up on both. Zone clicks don't reach the page's own `<img>` handlers (the SVG is a sibling), but they still bubble to shared ancestors such as a wrapping `<a>`. The README will say so.
 - **Cropping.** The SVG covers only the visible part of the image (the content box intersected with the element box), with its `viewBox` set to the matching source-pixel rectangle. Zones cropped out by `object-fit: cover` aren't clickable, and zones never spill outside the image element.
 - **Keyboard activation** gives `point` = the zone's centre and `originalEvent` = the `KeyboardEvent`. The keyboard never produces a `miss`.
-- **Lifecycle.** `createHitmap` returns immediately. Layout waits until the image has loaded (`naturalWidth > 0`) and has a non-zero rendered box. Until then, positions are `null` and no `layout` event fires. The first `layout` fires when it becomes measurable. A `display:none` image pauses `layout` until it's visible again. A `src` change re-runs layout (on `load`) and the aspect-ratio check.
+- **Lifecycle.** `createZones` returns immediately. Layout waits until the image has loaded (`naturalWidth > 0`) and has a non-zero rendered box. Until then, positions are `null` and no `layout` event fires. The first `layout` fires when it becomes measurable. A `display:none` image pauses `layout` until it's visible again. A `src` change re-runs layout (on `load`) and the aspect-ratio check.
 - **`state()` and `zone()`.** `state()` returns `[{ label, status, clicks }]` with no positions. `zone(label)` returns `{ label, status, clicks, data, position }` (`position` is `null` before layout), or `null` for an unknown label.
-- **Validation.** `createHitmap` throws a `TypeError` with a clear message in these cases: an unknown `hitmap` version, missing or non-positive image size, a missing or duplicate label, an unknown shape, a polygon with fewer than 3 points, or non-finite numbers. The checks are hand-written. The JSON Schema file is for documentation and the tool, not used at runtime.
+- **Validation.** `createZones` throws a `TypeError` with a clear message in these cases: an unknown `hitzones` version, missing or non-positive image size, a missing or duplicate label, an unknown shape, a polygon with fewer than 3 points, or non-finite numbers. The checks are hand-written. The JSON Schema file is for documentation and the tool, not used at runtime.
 - **Size.** 4 KB min+gzip is a target. CI prints the size and fails above 6 KB.
 
 ## The tool
 
-- `npm run tool` in the repo, or `npx hitmap edit [image] [zones.json]` once installed. It starts a tiny Node HTTP server (no dependencies) bound to `127.0.0.1` and opens the editor in the browser.
+- `npm run tool` in the repo, or `npx hitzones edit [image] [zones.json]` once installed. It starts a tiny Node HTTP server (no dependencies) bound to `127.0.0.1` and opens the editor in the browser.
 - **Open:** pick or drop an image (read locally, never uploaded anywhere), and optionally an existing zones JSON. When started with file paths, it loads those and **Save** writes straight back to the JSON file on disk. Otherwise **Save** downloads the file.
 - **Draw:** rectangle, ellipse and polygon tools. Select, move, resize, delete, and edit polygon vertices (add, move, remove). The canvas zooms (wheel or pinch) and pans for precise work on large art.
 - **Zone panel:** a list of zones. For each one, edit the label (uniqueness enforced), reorder it (z-order), and edit its `data` as JSON with validation.
@@ -189,12 +189,12 @@ hitmap reports clicks. It doesn't decide how a game is made accessible. The READ
 ## Repo layout
 
 ```
-hitmap/
+hitzones/
   src/            package source
   dist/           build output (published, not committed)
-  schema/         hitmap-v1.json (JSON Schema)
+  schema/         hitzones-v1.json (JSON Schema)
   tool/           editor (server.js + index.html + js/css)
-  bin/hitmap.js   CLI entry (`hitmap edit`)
+  bin/hitzones.js   CLI entry (`hitzones edit`)
   test/           unit + browser tests
   examples/       a minimal page using the package
   docs/design.md  this document

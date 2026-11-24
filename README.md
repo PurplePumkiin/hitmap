@@ -1,15 +1,15 @@
-# hitmap
+# hitzones
 
 Invisible click zones on an image that stay put at any screen size.
 
-You draw the zones once, over your real artwork, in a small editor. hitmap lays them over the image on your page and tells you when someone clicks one. That's all it does. What happens next (a popup, a sound, a counter) is up to you.
+You draw the zones once, over your real artwork, in a small editor. hitzones lays them over the image on your page and tells you when someone clicks one. That's all it does. What happens next (a popup, a sound, a counter) is up to you.
 
 It's handy for hidden-object games, clickable diagrams, and photos with things to discover.
 
 ## Draw your zones
 
 ```
-npx hitmap edit scene.jpg zones.json
+npx hitzones edit scene.jpg zones.json
 ```
 
 This opens the editor in your browser. Draw rectangles, ellipses or polygons around things, give each one a name, and save. The editor runs only on your machine and never goes to production.
@@ -17,13 +17,13 @@ This opens the editor in your browser. Draw rectangles, ellipses or polygons aro
 ## Use them
 
 ```
-npm install hitmap
+npm install hitzones
 ```
 
 ```js
-import { createHitmap } from 'hitmap';
+import { createZones } from 'hitzones';
 
-const map = createHitmap(document.querySelector('#scene'), zones);
+const map = createZones(document.querySelector('#scene'), zones);
 
 map.on('click', (e) => {
   console.log(e.label, e.status); // "snowman" "clicked"
@@ -32,7 +32,7 @@ map.on('click', (e) => {
 
 Every click tells you which zone it was, whether it's been clicked before, any data you attached in the editor, and where the zone sits on screen right now, so you can put your own popup next to it. If someone clicks the image but misses every zone, you hear about that too. When the image resizes, you get the new positions.
 
-No bundler? hitmap also works from a plain `<script>` tag.
+No bundler? hitzones also works from a plain `<script>` tag.
 
 ## Why it doesn't drift
 
