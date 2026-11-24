@@ -21,9 +21,13 @@ if (cmd === '--help' || cmd === '-h' || cmd === 'help') {
   console.log(`hitzones editor: ${url}`);
   console.log('Press Ctrl+C to stop.');
   try {
-    const [bin, ...pre] =
-      process.platform === 'darwin' ? ['open'] : process.platform === 'win32' ? ['cmd', '/c', 'start', '""'] : ['xdg-open'];
-    const child = spawn(bin, [...pre, url], { detached: true, stdio: 'ignore' });
+    const [bin, argv] =
+      process.platform === 'darwin'
+        ? ['open', [url]]
+        : process.platform === 'win32'
+          ? ['cmd', ['/c', 'start', '', url]]
+          : ['xdg-open', [url]];
+    const child = spawn(bin, argv, { detached: true, stdio: 'ignore' });
     child.on('error', () => {});
     child.unref();
   } catch {}

@@ -24,8 +24,11 @@ const typeOf = (p) => TYPES[path.extname(p).toLowerCase()] || 'application/octet
 
 export function startServer({ image, json, port = 0, root }) {
   const token = crypto.randomBytes(16).toString('hex');
-  const send = (res, status, body, type = 'text/plain; charset=utf-8') => {
-    res.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-store' });
+  let boundPort = 0;
+  const send = (res, status, body, type = 'text/plain; charset=utf-8', extra = {}) => {
+    const headers = { 'Content-Type': type, 'Cache-Control': 'no-store', ...extra };
+    if (type.startsWith('text/html')) headers['Referrer-Policy'] = 'no-referrer';
+    res.writeHead(status, headers);
     res.end(body);
   };
   const sendJson = (res, status, obj) => send(res, status, JSON.stringify(obj), 'application/json');
@@ -80,23 +83,38 @@ export function startServer({ image, json, port = 0, root }) {
       return send(res, 400, 'Not a hitzones v1 file');
     }
     const text = body.endsWith('\n') ? body : body + '\n';
-    const tmp = path.join(path.dirname(json), `.${path.basename(json)}.${process.pid}.${Date.now()}.tmp`);
+    const tmp = path.join(path.dirname(json), `.${path.basename(json)}.${crypto.randomBytes(6).toString('hex')}.tmp`);
     try {
-      fs.writeFileSync(tmp, text);
+      fs.writeFileSync(tmp, text, { flag: 'wx' });
       fs.renameSync(tmp, json);
     } catch (e) {
       fs.rmSync(tmp, { force: true });
-      return send(res, 500, `Write failed: ${e.message}`);
+      return send(res, 500, 'Write failed');
     }
     send(res, 200, 'saved');
   }
 
-  const server = http.createServer((req, res) => {
-    const url = new URL(req.url, 'http://127.0.0.1');
+  const handle = (req, res) => {
+    const host = req.headers.host;
+    if (host !== `127.0.0.1:${boundPort}` && host !== `localhost:${boundPort}`) {
+      return send(res, 403, 'Bad host');
+    }
+    let url;
+    try {
+      url = new URL(req.url, 'http://127.0.0.1');
+    } catch {
+      return send(res, 400, 'Bad request');
+    }
     const p = url.pathname;
     const authed = url.searchParams.get('t') === token;
 
-    if (req.method === 'PUT' && p === '/api/zones') return void saveZones(req, res);
+    if (req.method === 'PUT' && p === '/api/zones') {
+      saveZones(req, res).catch(() => {
+        if (!res.headersSent) send(res, 500, 'Internal error');
+        else res.end();
+      });
+      return;
+    }
     if (req.method !== 'GET') return send(res, 405, 'Method not allowed');
 
     if (p === '/') {
@@ -126,18 +144,32 @@ export function startServer({ image, json, port = 0, root }) {
       if (!authed) return send(res, 403, 'Bad token');
       if (!image) return send(res, 404, 'No image');
       return fs.readFile(image, (err, data) =>
-        err ? send(res, 404, 'Not found') : send(res, 200, data, typeOf(image)),
+        err
+          ? send(res, 404, 'Not found')
+          : send(res, 200, data, typeOf(image), {
+              'Content-Security-Policy': "sandbox; default-src 'none'",
+              'X-Content-Type-Options': 'nosniff',
+            }),
       );
     }
     if (p.startsWith('/tool/')) return serveStatic(res, 'tool', p.slice(6));
     if (p.startsWith('/dist/')) return serveStatic(res, 'dist', p.slice(6));
     send(res, 404, 'Not found');
+  };
+  const server = http.createServer((req, res) => {
+    try {
+      handle(req, res);
+    } catch {
+      if (!res.headersSent) send(res, 500, 'Internal error');
+      else res.end();
+    }
   });
 
   return new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(port, '127.0.0.1', () => {
       const addr = server.address();
+      boundPort = addr.port;
       resolve({
         url: `http://127.0.0.1:${addr.port}/?t=${token}`,
         token,

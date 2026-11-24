@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import net from 'node:net';
+import http from 'node:http';
 // @ts-expect-error plain JS module without declarations
 import { startServer } from '../../tool/server.js';
 
@@ -120,5 +122,50 @@ describe('tool server', () => {
   it('GET / answers 200 even before the UI exists', async () => {
     const s = await start({});
     expect((await fetch(new URL('/', s.url))).status).toBe(200);
+  });
+
+  it('survives a malformed request line', async () => {
+    const s = await start({});
+    const port = Number(new URL(s.url).port);
+    const reply = await new Promise<string>((resolve) => {
+      const sock = net.connect(port, '127.0.0.1', () =>
+        sock.write('GET http://[ HTTP/1.1\r\nHost: x\r\n\r\n'),
+      );
+      let buf = '';
+      sock.on('data', (d) => (buf += d));
+      sock.on('close', () => resolve(buf));
+      sock.on('error', () => resolve(buf));
+      setTimeout(() => sock.destroy(), 500);
+    });
+    expect(reply).toMatch(/^HTTP\/1\.1 (400|403)/);
+    expect((await fetch(new URL('/', s.url))).status).toBe(200);
+  });
+
+  it('rejects a foreign Host header', async () => {
+    const s = await start({});
+    const port = Number(new URL(s.url).port);
+    const status = await new Promise<number>((resolve) => {
+      const req = http.request(
+        { host: '127.0.0.1', port, path: '/', headers: { Host: `evil.example:${port}` } },
+        (res) => { res.resume(); resolve(res.statusCode!); },
+      );
+      req.end();
+    });
+    expect(status).toBe(403);
+    const ok = await fetch(`http://localhost:${port}/`);
+    expect(ok.status).toBe(200);
+  });
+
+  it('hardens image and html responses', async () => {
+    const dir = tmp();
+    const s = await start({ image: path.join(dir, 'scene.svg') });
+    const img = await fetch(new URL(`/api/image?t=${s.token}`, s.url));
+    expect(img.headers.get('content-security-policy')).toBe("sandbox; default-src 'none'");
+    expect(img.headers.get('x-content-type-options')).toBe('nosniff');
+    const html = await fetch(new URL('/tool/../x', s.url));
+    expect(html.status).toBe(404);
+    fs.writeFileSync(path.join(dir, 'a.html'), '<p>x</p>');
+    const t = await fetch(new URL('/', s.url));
+    expect(t.headers.get('content-type')).toMatch(/text\/plain|text\/html/);
   });
 });
