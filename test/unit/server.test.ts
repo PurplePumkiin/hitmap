@@ -168,4 +168,11 @@ describe('tool server', () => {
     expect(t.headers.get('content-type')).toMatch(/^text\/html/);
     expect(t.headers.get('referrer-policy')).toBe('no-referrer');
   });
+
+  it('answers 500 when the editor files are missing', async () => {
+    const s = await start({ root: fs.mkdtempSync(path.join(os.tmpdir(), 'hz-empty-')) });
+    const r = await fetch(new URL('/', s.url));
+    expect(r.status).toBe(500);
+    expect(await r.text()).toBe('editor files missing');
+  });
 });

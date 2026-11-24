@@ -11,8 +11,6 @@ const TYPES = {
   '.mjs': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
-  '.map': 'application/json; charset=utf-8',
-  '.ts': 'text/plain; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
@@ -120,7 +118,7 @@ export function startServer({ image, json, port = 0, root }) {
     if (p === '/') {
       const index = path.join(root, 'tool', 'index.html');
       return fs.readFile(index, (err, data) =>
-        err ? send(res, 200, 'editor UI not built yet') : send(res, 200, data, 'text/html; charset=utf-8'),
+        err ? send(res, 500, 'editor files missing') : send(res, 200, data, 'text/html; charset=utf-8'),
       );
     }
     if (p === '/api/session') {
