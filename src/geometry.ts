@@ -75,6 +75,8 @@ export function computeLayout(
   origin: XY,
   scale: number,
 ): Layout | null {
+  const pos = (n: number) => Number.isFinite(n) && n > 0;
+  if (!pos(m.natural.width) || !pos(m.natural.height) || !pos(image.width) || !pos(image.height) || !pos(scale)) return null;
   const content = contentBox(m);
   const visible = intersect(content, contentArea(m));
   if (visible.width <= 0 || visible.height <= 0 || content.width <= 0 || content.height <= 0) return null;
@@ -86,6 +88,7 @@ export function computeLayout(
     width: visible.width / kx,
     height: visible.height / ky,
   };
+  if (![content, visible, source].every((b) => Object.values(b).every(Number.isFinite))) return null;
   return { content, visible, source, image, origin, scale };
 }
 

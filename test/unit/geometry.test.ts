@@ -55,6 +55,19 @@ describe('computeLayout', () => {
   it('returns null for zero area', () => {
     expect(computeLayout(el({ width: 0 }), { width: 400, height: 200 }, { x: 0, y: 0 }, 1)).toBeNull();
   });
+  const img = { width: 400, height: 200 };
+  const o = { x: 0, y: 0 };
+  it('returns null for an unloaded image (natural 0x0)', () => {
+    const natural = { width: 0, height: 0 };
+    expect(computeLayout(el({ natural, fit: 'cover' }), img, o, 1)).toBeNull();
+    expect(computeLayout(el({ natural, fit: 'contain' }), img, o, 1)).toBeNull();
+  });
+  it('returns null for a zero-sized JSON image', () => {
+    expect(computeLayout(el(), { width: 0, height: 100 }, o, 1)).toBeNull();
+  });
+  it('returns null for a zero scale', () => {
+    expect(computeLayout(el(), img, o, 0)).toBeNull();
+  });
 });
 
 describe('zoneBounds', () => {
