@@ -1,5 +1,5 @@
-import type { Layout } from './geometry';
-import type { Options, XY, ZonesJSON } from './types';
+import type { Layout } from './geometry.js';
+import type { Options, XY, ZonesJSON } from './types.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 

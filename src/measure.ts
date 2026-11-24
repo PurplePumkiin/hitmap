@@ -1,5 +1,5 @@
-import type { ElementMetrics, Sides } from './geometry';
-import type { XY } from './types';
+import type { ElementMetrics, Sides } from './geometry.js';
+import type { XY } from './types.js';
 
 /** `offset`: the img's border-box corner in its containing block's padding-box coordinates (CSS px, untransformed). */
 export type Measured = { metrics: ElementMetrics; origin: XY; scale: number; offset: XY };

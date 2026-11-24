@@ -1,4 +1,4 @@
-import type { ZonesJSON } from './types';
+import type { ZonesJSON } from './types.js';
 
 const fail = (msg: string): never => {
   throw new TypeError('hitzones: ' + msg);

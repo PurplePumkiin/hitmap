@@ -1,4 +1,4 @@
-import type { Box, Point, Position, XY, Zone } from './types';
+import type { Box, Point, Position, XY, Zone } from './types.js';
 
 export type Sides = { top: number; right: number; bottom: number; left: number };
 export type ElementMetrics = {

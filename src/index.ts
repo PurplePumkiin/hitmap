@@ -1,12 +1,12 @@
-import { computeLayout, pointFromClient, pointFromImage, positionOf, zoneBounds, type Layout } from './geometry';
-import { createEmitter } from './emitter';
-import { measure } from './measure';
-import { createOverlay } from './overlay';
-import { parseZones } from './parse';
-import type { ClickEvent, LayoutEvent, MissEvent, Options, Point, Position, Status, Zone } from './types';
+import { computeLayout, pointFromClient, pointFromImage, positionOf, zoneBounds, type Layout } from './geometry.js';
+import { createEmitter } from './emitter.js';
+import { measure } from './measure.js';
+import { createOverlay } from './overlay.js';
+import { parseZones } from './parse.js';
+import type { ClickEvent, LayoutEvent, MissEvent, Options, Point, Position, Status, Zone } from './types.js';
 
-export { parseZones } from './parse';
-export type * from './types';
+export { parseZones } from './parse.js';
+export type * from './types.js';
 
 export type HitzonesEvents = { click: ClickEvent; miss: MissEvent; layout: LayoutEvent };
 export type ZoneState = { label: string; status: Status; clicks: number };
