@@ -171,14 +171,15 @@ hitzones reports clicks. It doesn't decide how a game is made accessible. The RE
 ## The tool
 
 - `npm run tool` in the repo, or `npx hitzones edit [image] [zones.json]` once installed. It starts a tiny Node HTTP server (no dependencies) bound to `127.0.0.1` and opens the editor in the browser.
-- **Open:** pick or drop an image (read locally, never uploaded anywhere), and optionally an existing zones JSON. When started with file paths, it loads those and **Save** writes straight back to the JSON file on disk. Otherwise **Save** downloads the file.
+- **Open:** pick or drop an image (read locally, never uploaded anywhere), and optionally an existing zones JSON. When started with file paths, it loads the image and, if it exists, the zones file; a zones path that doesn't exist yet starts the editor empty.
+- **Save:** always downloads the JSON through the browser, after committing any panel field still being edited and refusing while there are validation or panel errors. The file is named after the zones path given at startup, otherwise `<image name without extension>.zones.json`. Changed 2026-11-24: Save always downloads; the server never writes files.
 - **Draw:** rectangle, ellipse and polygon tools. Select, move, resize, delete, and edit polygon vertices (add, move, remove). The canvas zooms (wheel or pinch) and pans for precise work on large art.
 - **Zone panel:** a list of zones. For each one, edit the label (uniqueness enforced), reorder it (z-order), and edit its `data` as JSON with validation.
 - **Preview:** runs the real package against the image at an adjustable width (phone, tablet, desktop presets) and logs events, to prove alignment before shipping.
 - Plain HTML, CSS and JS in `tool/`, no framework, served as-is.
 - **Image size and name:** `image.width`/`height` come from the image's natural size, and `image.src` is the file's base name. If a loaded JSON's image size doesn't match the opened image, the tool warns and offers to rescale the zones proportionally.
 - **Saving:** 2-space indented JSON, known keys in a fixed order, unknown keys preserved (their order isn't guaranteed).
-- **Server safety:** binds `127.0.0.1` on a free port, prints the URL and tries to open the browser. It can write only to the JSON path given at startup. Save requests must carry a random per-run token from the page URL.
+- **Server safety:** binds `127.0.0.1` on a free port, prints the URL and tries to open the browser. It is read-only: it serves the editor, the image and the zones file given at startup, answers every non-GET request with 405, and writes nothing to disk. Requests for the session and the image must carry a random per-run token from the page URL, the `Host` header must be the bound loopback address, and static paths stay inside `tool/` and `dist/`.
 
 ## Packaging
 
@@ -205,7 +206,7 @@ hitzones/
 
 - Unit tests for the coordinate maths: content box under every `object-fit` and `object-position`, padding and border, conversion between the four spaces, and polygon and ellipse bounding boxes.
 - Browser tests (Playwright) that render an image at several widths, with `object-fit: cover`, under a CSS transform and inside a scrolling container. They click known image pixels and assert the right zone, the right `status` and the right positions. They also check drag-versus-click and `reset()`.
-- A tool smoke test: load an image and a JSON file, draw each shape, save, and reload the same JSON.
+- A tool smoke test: load an image and a JSON file, draw each shape, save, and check the downloaded JSON (the file on disk stays untouched).
 
 ## Constraints
 

@@ -33,6 +33,20 @@ async function start(opts: Record<string, unknown>): Promise<Srv> {
 const readJson = (file: string) => JSON.parse(fs.readFileSync(file, 'utf8'));
 const fixtureJson = () => readJson(fixture('zones.json'));
 
+/** Runs `trigger` and returns the download it starts: its suggested name and parsed JSON. */
+async function saveDownload(page: Page, trigger: () => Promise<unknown>) {
+  const [download] = await Promise.all([page.waitForEvent('download'), trigger()]);
+  const file = await download.path();
+  return { name: download.suggestedFilename(), json: readJson(file!) };
+}
+/** Counts downloads and writes from here on, to assert that a blocked Save did neither. */
+function watchSaves(page: Page) {
+  const seen = { downloads: 0, writes: 0 };
+  page.on('download', () => seen.downloads++);
+  page.on('request', (r) => r.method() !== 'GET' && seen.writes++);
+  return seen;
+}
+
 /** Client coordinates of an image pixel on the editor canvas. */
 async function at(page: Page, x: number, y: number) {
   return page.evaluate(
@@ -62,8 +76,9 @@ async function ready(page: Page, rows: number) {
   await expect(page.locator('#canvas image')).toHaveAttribute('width', '400');
 }
 
-test('load image + json, draw each shape, save, reload', async ({ page }) => {
+test('load image + json, draw each shape, save downloads, file on disk untouched', async ({ page }) => {
   const t = tmp();
+  const before = fs.readFileSync(t.json, 'utf8');
   const s = await start({ image: t.image, json: t.json });
   await page.goto(s.url);
   await ready(page, 4);
@@ -86,9 +101,9 @@ test('load image + json, draw each shape, save, reload', async ({ page }) => {
   await data.fill('{"n":1}');
   await data.blur();
 
-  await page.click('[data-action="save"]');
-  await expect(page.locator('#status')).toContainText('Saved');
-  const saved = readJson(t.json);
+  const { name, json: saved } = await saveDownload(page, () => page.click('[data-action="save"]'));
+  expect(name).toBe('zones.json');
+  await expect(page.locator('#status')).toHaveText('Downloaded zones.json');
   expect(saved.zones).toHaveLength(7);
   const door = saved.zones.find((z: any) => z.label === 'door');
   expect(door).toMatchObject({ shape: 'rect', data: { n: 1 } });
@@ -104,25 +119,26 @@ test('load image + json, draw each shape, save, reload', async ({ page }) => {
   expect(poly.shape).toBe('polygon');
   expect(poly.points).toHaveLength(3);
   expect(saved.image).toEqual(fixtureJson().image);
+  expect(fs.readFileSync(t.json, 'utf8')).toBe(before);
 
   await page.reload();
-  await ready(page, 7);
+  await ready(page, 4);
 });
 
-test('save is blocked on duplicate label and file is untouched', async ({ page }) => {
+test('save is blocked on duplicate label: no download, file untouched', async ({ page }) => {
   const j = fixtureJson();
   j.zones[1].label = 'box';
   const t = tmp(j);
   const before = fs.readFileSync(t.json, 'utf8');
   const s = await start({ image: t.image, json: t.json });
-  let puts = 0;
-  page.on('request', (r) => r.method() === 'PUT' && puts++);
+  const seen = watchSaves(page);
   await page.goto(s.url);
   await ready(page, 4);
   await page.click('[data-action="save"]');
   await expect(page.locator('#status')).toContainText('duplicate label "box"');
-  await expect(page.locator('#status')).not.toContainText('Saved');
-  expect(puts).toBe(0);
+  await expect(page.locator('#status')).not.toContainText('Downloaded');
+  await page.waitForTimeout(300);
+  expect(seen).toEqual({ downloads: 0, writes: 0 });
   expect(fs.readFileSync(t.json, 'utf8')).toBe(before);
 });
 
@@ -140,9 +156,8 @@ test('mismatched image size offers rescale and rescales on accept', async ({ pag
   await expect(bar).toContainText('400×200');
   await bar.locator('[data-action="rescale"]').click();
   await expect(bar).toBeHidden();
-  await page.click('[data-action="save"]');
-  await expect(page.locator('#status')).toContainText('Saved');
-  const saved = readJson(t.json);
+  const { name, json: saved } = await saveDownload(page, () => page.click('[data-action="save"]'));
+  expect(name).toBe('zones.json');
   expect(saved.image).toEqual({ width: 400, height: 200, src: 'scene.svg' });
   expect(saved.zones[0]).toMatchObject({ label: 'box', x: 20, y: 20, width: 80, height: 60 });
 });
@@ -179,6 +194,7 @@ test('without paths: open image by file input, save downloads', async ({ page })
   await expect(page.locator('.zone-row')).toHaveCount(1);
   const [download] = await Promise.all([page.waitForEvent('download'), page.click('[data-action="save"]')]);
   expect(download.suggestedFilename()).toBe('scene.zones.json');
+  await expect(page.locator('#status')).toHaveText('Downloaded scene.zones.json');
   const file = await download.path();
   const saved = readJson(file!);
   expect(saved.image).toEqual({ width: 400, height: 200, src: 'scene.svg' });
@@ -330,22 +346,39 @@ test('Ctrl+S commits the field being edited before saving', async ({ page }) => 
   const s = await start({ image: t.image, json: t.json });
   await page.goto(s.url);
   await ready(page, 4);
+  const before = fs.readFileSync(t.json, 'utf8');
   await page.locator('.zone-row[data-label="ring"] textarea[name=data]').fill('{"k":2}');
-  await page.keyboard.press('Control+s');
-  await expect(page.locator('#status')).toContainText('Saved');
-  expect(readJson(t.json).zones.find((z: any) => z.label === 'ring').data).toEqual({ k: 2 });
+  const first = await saveDownload(page, () => page.keyboard.press('Control+s'));
+  expect(first.json.zones.find((z: any) => z.label === 'ring').data).toEqual({ k: 2 });
 
   await page.locator('.zone-row[data-label="ring"] input[name=label]').fill('hoop');
-  await page.keyboard.press('Control+s');
-  await expect.poll(() => readJson(t.json).zones.map((z: any) => z.label)).toContain('hoop');
+  const second = await saveDownload(page, () => page.keyboard.press('Control+s'));
+  expect(second.name).toBe('zones.json');
+  expect(second.json.zones.map((z: any) => z.label)).toContain('hoop');
+  expect(fs.readFileSync(t.json, 'utf8')).toBe(before);
 });
 
-test('invalid JSON in a data field blocks Save', async ({ page }) => {
+test('a zones file that does not exist starts empty and names the download', async ({ page }) => {
+  const t = tmp();
+  const json = path.join(t.dir, 'new.json');
+  const s = await start({ image: t.image, json });
+  await page.goto(s.url);
+  await ready(page, 0);
+  await page.click('[data-tool="rect"]');
+  await drag(page, [10, 10], [60, 40]);
+  await expect(page.locator('.zone-row')).toHaveCount(1);
+  const { name, json: saved } = await saveDownload(page, () => page.click('[data-action="save"]'));
+  expect(name).toBe('new.json');
+  expect(saved.image).toEqual({ width: 400, height: 200, src: 'scene.svg' });
+  expect(saved.zones).toHaveLength(1);
+  expect(fs.existsSync(json)).toBe(false);
+});
+
+test('invalid JSON in a data field blocks Save: no download', async ({ page }) => {
   const t = tmp();
   const before = fs.readFileSync(t.json, 'utf8');
   const s = await start({ image: t.image, json: t.json });
-  let puts = 0;
-  page.on('request', (r) => r.method() === 'PUT' && puts++);
+  const seen = watchSaves(page);
   await page.goto(s.url);
   await ready(page, 4);
   await page.locator('.zone-row[data-label="ring"] textarea[name=data]').fill('{bad');
@@ -354,6 +387,7 @@ test('invalid JSON in a data field blocks Save', async ({ page }) => {
   await expect(page.locator('#status')).toContainText('"ring"');
   await page.click('[data-action="save"]');
   await expect(page.locator('#status')).toContainText('not valid JSON');
-  expect(puts).toBe(0);
+  await page.waitForTimeout(300);
+  expect(seen).toEqual({ downloads: 0, writes: 0 });
   expect(fs.readFileSync(t.json, 'utf8')).toBe(before);
 });

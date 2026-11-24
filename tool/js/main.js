@@ -14,7 +14,7 @@ let doc = null;
 let selected = null;
 /** @type {{url:string, name:string, width:number, height:number, revoke:boolean}|null} */
 let image = null;
-let session = { imageName: '', hasImage: false, json: null, writable: false };
+let session = { imageName: '', hasImage: false, json: null, jsonName: null };
 
 const status = (msg, kind = '') => {
   statusEl.textContent = msg;
@@ -177,36 +177,24 @@ async function openFiles(files) {
   for (const f of list.filter(isJson)) loadJson(await f.text(), f.name);
 }
 
-async function save() {
+function save() {
   // Commit a label or data field still being edited (Ctrl+S): blur fires its change/blur handler.
   const active = document.activeElement;
   if (active instanceof HTMLElement && active.closest('#zones') && /^(INPUT|TEXTAREA)$/.test(active.tagName)) active.blur();
   if (!doc) return status('Nothing to save yet', 'error');
   const errors = [...panel.errors(), ...validate(doc, parseZones)];
   if (errors.length) return status('Not saved: ' + errors.join('; '), 'error');
-  const text = serialize(doc);
-  if (!session.writable) {
-    const base = baseName(image ? image.name : doc.image.src).replace(/\.[^.]+$/, '') || 'zones';
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
-    a.download = `${base}.zones.json`;
-    document.body.append(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    return status(`Downloaded ${a.download}`, 'ok');
-  }
-  try {
-    const r = await fetch('/api/zones', {
-      method: 'PUT',
-      headers: { 'X-Hitzones-Token': token, 'Content-Type': 'application/json' },
-      body: text,
-    });
-    if (r.ok) status(`Saved at ${new Date().toLocaleTimeString()}`, 'ok');
-    else status(`Not saved: the server answered ${r.status} ${await r.text()}`, 'error');
-  } catch {
-    status('Not saved: the editor server is not reachable', 'error');
-  }
+  const name = session.jsonName
+    ? baseName(session.jsonName)
+    : `${baseName(image ? image.name : doc.image.src).replace(/\.[^.]+$/, '') || 'zones'}.zones.json`;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([serialize(doc)], { type: 'application/json' }));
+  a.download = name;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  status(`Downloaded ${name}`, 'ok');
 }
 
 function setTool(t) {
@@ -258,9 +246,9 @@ async function start() {
   try {
     const r = await fetch(`/api/session?t=${encodeURIComponent(token)}`);
     if (r.ok) session = await r.json();
-    else status('Not connected to the editor server; Save will download the file', 'error');
+    else status('Not connected to the editor server', 'error');
   } catch {
-    status('Not connected to the editor server; Save will download the file', 'error');
+    status('Not connected to the editor server', 'error');
   }
   if (session.json != null) loadJson(session.json, 'the zones file');
   if (session.hasImage) await loadImage(`/api/image?t=${encodeURIComponent(token)}`, session.imageName, false);

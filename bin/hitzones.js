@@ -9,7 +9,9 @@ const USAGE = `Usage:
   hitzones edit [image] [zones.json]   open the editor in your browser
   hitzones --help                      show this help
 
-If zones.json is given, Save writes straight back to it (created on first save).`;
+If zones.json is given and exists, the editor loads it; if it doesn't, the editor starts
+empty. Save downloads the JSON through your browser, named after zones.json when given,
+otherwise <image>.zones.json. The editor's server never writes files.`;
 
 const [cmd, ...args] = process.argv.slice(2);
 
@@ -17,7 +19,7 @@ if (cmd === '--help' || cmd === '-h' || cmd === 'help') {
   console.log(USAGE);
 } else if (cmd === 'edit') {
   const isJson = (a) => a !== undefined && /\.json$/i.test(a);
-  // Save overwrites the second argument, so a swapped pair would write JSON over the image.
+  // A swapped pair would load the image as zones and serve the JSON as the image.
   if (isJson(args[0]) || (args[1] !== undefined && !isJson(args[1]))) {
     console.error('hitzones: give the image first, then the zones file (.json):');
     console.error('  hitzones edit scene.jpg zones.json');
@@ -28,7 +30,8 @@ if (cmd === '--help' || cmd === '-h' || cmd === 'help') {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const { url, close } = await startServer({ image, json, root });
   console.log(`hitzones editor: ${url}`);
-  if (json) console.log(`Save writes to: ${json}`);
+  if (json && fs.existsSync(json)) console.log(`Loading zones from: ${json}`);
+  else if (json) console.log(`Zones file not found; starting empty (Save downloads ${path.basename(json)})`);
   console.log('Press Ctrl+C to stop.');
   try {
     const [bin, argv] =

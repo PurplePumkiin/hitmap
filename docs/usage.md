@@ -2,7 +2,7 @@
 
 hitzones attaches to an existing `<img>`, lays invisible zones over it and reports clicks. It draws nothing and has no game logic. For the file format see [format.md](format.md). A working page is in [`examples/`](../examples/). It imports `../dist/hitzones.js` and fetches its zones file, so run `npm run build` first and open it over HTTP: `node scripts/static.mjs` serves the repo at `http://127.0.0.1:4719/examples/index.html`.
 
-The package itself runs in the browser and needs no Node at runtime. Node 24+ is needed to run the editor (`npx hitzones edit`) and to install the package with npm. Developing hitzones itself needs Node 26 (see `.nvmrc`).
+The package itself runs in the browser and needs no Node at runtime. Node 24+ is needed to run the editor (`npx hitzones edit [image] [zones.json]`) and to install the package with npm. The editor loads `zones.json` if it exists and otherwise starts empty; its Save always downloads the JSON through the browser and never writes to disk. Developing hitzones itself needs Node 26 (see `.nvmrc`).
 
 ## API
 

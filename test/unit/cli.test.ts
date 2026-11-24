@@ -16,6 +16,8 @@ describe('cli', () => {
     const r = run('--help');
     expect(r.status).toBe(0);
     expect(r.stdout).toMatch(/hitzones edit \[image\] \[zones\.json\]/);
+    expect(r.stdout).toMatch(/Save downloads/);
+    expect(r.stdout).not.toMatch(/Save writes/);
   });
 
   it.each([
@@ -33,9 +35,8 @@ describe('cli', () => {
     expect(fs.readFileSync(path.join(dir, 'scene.png'), 'utf8')).toBe('not really a png');
   });
 
-  it('edit warns on a missing image, still starts, and prints where Save writes', async () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hz-cli-'));
-    const child = spawn(process.execPath, [bin, 'edit', 'missing.png', 'zones.json'], { cwd: dir, env });
+  const startCli = async (dir: string, args: string[]) => {
+    const child = spawn(process.execPath, [bin, 'edit', ...args], { cwd: dir, env });
     let out = '';
     let err = '';
     child.stdout.on('data', (d) => (out += d));
@@ -52,8 +53,25 @@ describe('cli', () => {
     const exited = new Promise((r) => child.on('exit', r));
     child.kill('SIGINT');
     await exited;
+    return { out, err };
+  };
+
+  it('edit warns on a missing image, still starts, and says a missing zones file starts empty', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hz-cli-'));
+    const { out, err } = await startCli(dir, ['missing.png', 'zones.json']);
     expect(err).toMatch(/warning: image not found: .*missing\.png/);
-    expect(out).toContain(`Save writes to: ${path.join(fs.realpathSync(dir), 'zones.json')}`);
+    expect(out).toContain('Zones file not found; starting empty (Save downloads zones.json)');
+    expect(out).not.toMatch(/Save writes/);
     expect(out).toMatch(/hitzones editor: http:\/\/127\.0\.0\.1:\d+\//);
+    expect(fs.existsSync(path.join(dir, 'zones.json'))).toBe(false);
+  });
+
+  it('edit prints where it loads an existing zones file from', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hz-cli-'));
+    fs.writeFileSync(path.join(dir, 'scene.png'), 'not really a png');
+    fs.writeFileSync(path.join(dir, 'zones.json'), '{"hitzones":1}');
+    const { out } = await startCli(dir, ['scene.png', 'zones.json']);
+    expect(out).toContain(`Loading zones from: ${path.join(fs.realpathSync(dir), 'zones.json')}`);
+    expect(fs.readFileSync(path.join(dir, 'zones.json'), 'utf8')).toBe('{"hitzones":1}');
   });
 });

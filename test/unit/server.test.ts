@@ -43,16 +43,19 @@ describe('tool server', () => {
     expect(r.headers.get('cache-control')).toBe('no-store');
     const j = await r.json();
     expect(j.json).toBe(fs.readFileSync(path.join(dir, 'zones.json'), 'utf8'));
-    expect(j).toMatchObject({ imageName: 'scene.svg', hasImage: true, writable: true });
+    expect(Object.keys(j).sort()).toEqual(['hasImage', 'imageName', 'json', 'jsonName']);
+    expect(j).toMatchObject({ imageName: 'scene.svg', hasImage: true, jsonName: 'zones.json' });
   });
 
   it('session json is null when the file does not exist or no path given', async () => {
     const dir = tmp();
     const a = await start({ json: path.join(dir, 'new.json') });
-    expect((await (await fetch(new URL(`/api/session?t=${a.token}`, a.url))).json()).json).toBeNull();
+    expect(await (await fetch(new URL(`/api/session?t=${a.token}`, a.url))).json()).toMatchObject({
+      json: null, jsonName: 'new.json',
+    });
     const b = await start({});
-    expect(await (await fetch(new URL(`/api/session?t=${b.token}`, b.url))).json()).toMatchObject({
-      json: null, writable: false, hasImage: false,
+    expect(await (await fetch(new URL(`/api/session?t=${b.token}`, b.url))).json()).toEqual({
+      imageName: '', hasImage: false, json: null, jsonName: null,
     });
   });
 
@@ -64,47 +67,30 @@ describe('tool server', () => {
     expect((await fetch(new URL('/api/image', s.url))).status).toBe(403);
   });
 
-  it('PUT writes the file; bad token is 403 and leaves it unchanged', async () => {
+  it('PUT /api/zones is 405 and the zones file on disk is untouched', async () => {
     const dir = tmp();
     const json = path.join(dir, 'zones.json');
     const before = fs.readFileSync(json, 'utf8');
     const s = await start({ json });
-    expect((await put(s, '{"hitzones":1}', 'nope')).status).toBe(403);
+    expect((await put(s, '{"hitzones":1}')).status).toBe(405);
+    expect((await put(s, '{"hitzones":1}', 'nope')).status).toBe(405);
     expect(fs.readFileSync(json, 'utf8')).toBe(before);
-    expect((await put(s, '{"hitzones":1}')).status).toBe(200);
-    expect(fs.readFileSync(json, 'utf8')).toBe('{"hitzones":1}\n');
     expect(fs.readdirSync(dir).sort()).toEqual(['scene.svg', 'zones.json']);
   });
 
-  it('creates the file when it does not exist yet', async () => {
+  it('every non-GET method is 405 and never creates the zones file', async () => {
     const dir = tmp();
     const json = path.join(dir, 'fresh.json');
     const s = await start({ json });
-    expect((await put(s, '{"hitzones":1}\n')).status).toBe(200);
-    expect(fs.readFileSync(json, 'utf8')).toBe('{"hitzones":1}\n');
-  });
-
-  it('rejects invalid bodies and leaves the file unchanged', async () => {
-    const dir = tmp();
-    const json = path.join(dir, 'zones.json');
-    const before = fs.readFileSync(json, 'utf8');
-    const s = await start({ json });
-    for (const body of ['{"hitzones":2}', 'not json', '[]', 'null']) {
-      expect((await put(s, body)).status).toBe(400);
+    for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+      const r = await fetch(new URL(`/api/zones?t=${s.token}`, s.url), {
+        method,
+        headers: { 'X-Hitzones-Token': s.token },
+        body: '{"hitzones":1}',
+      });
+      expect(r.status).toBe(405);
     }
-    expect(fs.readFileSync(json, 'utf8')).toBe(before);
-  });
-
-  it('rejects bodies over 5 MB', async () => {
-    const dir = tmp();
-    const s = await start({ json: path.join(dir, 'zones.json') });
-    const big = '{"hitzones":1,"pad":"' + 'a'.repeat(5 * 1024 * 1024) + '"}';
-    expect((await put(s, big)).status).toBe(413);
-  });
-
-  it('PUT without a json path is 409', async () => {
-    const s = await start({});
-    expect((await put(s, '{"hitzones":1}')).status).toBe(409);
+    expect(fs.existsSync(json)).toBe(false);
   });
 
   it('static routes stay inside tool/ and dist/', async () => {
