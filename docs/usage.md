@@ -2,7 +2,7 @@
 
 hitzones attaches to an existing `<img>`, lays invisible zones over it and reports clicks. It draws nothing and has no game logic. For the file format see [format.md](format.md). A working page is in [`examples/`](../examples/).
 
-Using the package and the editor needs Node 18+. Developing hitzones itself needs Node 22.12+.
+Using the package and the editor needs Node 18+. Developing hitzones itself needs Node 26 (see `.nvmrc`).
 
 ## API
 
