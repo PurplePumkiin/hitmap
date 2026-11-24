@@ -26,6 +26,13 @@ const valid = {
 };
 
 describe('parseZones', () => {
+  it('requires image.src to be a string when present', () => {
+    const withSrc = (src: unknown) => ({ ...valid, image: { width: 10, height: 10, src } });
+    expect(() => parseZones(withSrc(42))).toThrow(new TypeError('hitzones: image.src must be a string'));
+    expect(() => parseZones(withSrc(null))).toThrow(TypeError);
+    expect(() => parseZones({ ...valid, image: { width: 10, height: 10 } })).not.toThrow();
+    expect(() => parseZones(withSrc(''))).not.toThrow();
+  });
   it('passes valid data through untouched', () => {
     expect(parseZones(valid)).toBe(valid);
     expect(parseZones(valid)).toEqual(valid);

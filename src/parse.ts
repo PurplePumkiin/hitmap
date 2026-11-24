@@ -14,6 +14,7 @@ export function parseZones(input: unknown): ZonesJSON {
   const img = input.image;
   if (!isObj(img) || !num(img.width) || !num(img.height) || img.width <= 0 || img.height <= 0)
     return fail('image.width and image.height must be positive numbers');
+  if ('src' in img && typeof img.src !== 'string') return fail('image.src must be a string');
   if (!Array.isArray(input.zones)) return fail('zones must be an array');
   const seen = new Set<string>();
   input.zones.forEach((z: unknown, i: number) => {

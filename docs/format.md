@@ -1,6 +1,6 @@
 # The hitzones format (v1)
 
-A hitzones file is JSON. It describes invisible click zones laid over one image, in that image's own pixel coordinates. A JSON Schema is in `schema/hitzones-v1.json`; `parseZones()` in the package does the same checks (plus label uniqueness) at runtime.
+A hitzones file is JSON. It describes invisible click zones laid over one image, in that image's own pixel coordinates. A JSON Schema is in `schema/hitzones-v1.json`. `parseZones()` in the package makes the same checks at runtime, including that `image.src` is a string when present, and adds one the schema can't express: label uniqueness.
 
 ```json
 {
@@ -31,10 +31,10 @@ A hitzones file is JSON. It describes invisible click zones laid over one image,
 
 - `hitzones`: the format version, the integer `1`. Readers reject versions they don't know.
 - `image.width` / `image.height`: the pixel size of the art the zones were drawn on. Required, greater than 0.
-- `image.src`: informational only (the file name the editor saw). The package never loads it.
+- `image.src`: optional, a string. Informational only (the file name the editor saw). The package never loads it.
 - `zones`: an array. Order is z-order: later zones sit on top where zones overlap.
 - `zones[].label`: required, a non-empty string, unique within the file. It is the zone's identity in every event.
-- `zones[].shape`: `rect`, `ellipse` or `polygon`. All numbers are in image pixels, must be finite, and may be fractional.
+- `zones[].shape`: `rect`, `ellipse` or `polygon`. All numbers are in image pixels, must be finite, and may be fractional. The editor rounds geometry to 2 decimal places when it saves; hand-written files may use any precision.
 - `zones[].data`: optional, any JSON value, returned as-is.
 
 ## Shapes
@@ -51,4 +51,4 @@ Unknown top-level and zone keys are preserved by the editor and ignored by the p
 
 ## Validation errors
 
-Invalid files make `parseZones()` (and `createZones()`) throw a `TypeError` whose message starts with `hitzones: ` and names the zone index and label where there is one. Rejected: an unknown version, a missing or non-positive image size, a missing or duplicate label, an unknown shape, a polygon with fewer than 3 points, and non-finite numbers.
+Invalid files make `parseZones()` (and `createZones()`) throw a `TypeError` whose message starts with `hitzones: ` and names the zone index and label where there is one. Rejected: an unknown version, a missing or non-positive image size, an `image.src` that isn't a string, a missing or duplicate label, an unknown shape, a polygon with fewer than 3 points, and non-finite numbers.

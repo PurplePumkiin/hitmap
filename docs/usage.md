@@ -1,14 +1,16 @@
 # Using hitzones
 
-hitzones attaches to an existing `<img>`, lays invisible zones over it and reports clicks. It draws nothing and has no game logic. For the file format see [format.md](format.md). A working page is in [`examples/`](../examples/).
+hitzones attaches to an existing `<img>`, lays invisible zones over it and reports clicks. It draws nothing and has no game logic. For the file format see [format.md](format.md). A working page is in [`examples/`](../examples/). It imports `../dist/hitzones.js` and fetches its zones file, so run `npm run build` first and open it over HTTP: `node scripts/static.mjs` serves the repo at `http://127.0.0.1:4719/examples/index.html`.
 
-Using the package and the editor needs Node 24+. Developing hitzones itself needs Node 26 (see `.nvmrc`).
+The package itself runs in the browser and needs no Node at runtime. Node 24+ is needed to run the editor (`npx hitzones edit`) and to install the package with npm. Developing hitzones itself needs Node 26 (see `.nvmrc`).
 
 ## API
 
 ```js
 import { createZones, parseZones } from 'hitzones';
-// or: <script src="hitzones.iife.js"></script> -> window.Hitzones.createZones
+// or, without a bundler: <script src="node_modules/hitzones/dist/hitzones.iife.js"></script>
+// from a CDN:            <script src="https://unpkg.com/hitzones/dist/hitzones.iife.js"></script>
+// both expose window.Hitzones (Hitzones.createZones, Hitzones.parseZones)
 
 const map = createZones(document.querySelector('#scene'), zonesJson, options);
 ```
@@ -33,7 +35,7 @@ const map = createZones(document.querySelector('#scene'), zonesJson, options);
 |---|---|
 | `click` | `{ label, status, clicks, data, position, point, originalEvent }`. `status` is `'clicked'` for the first click since load or `reset()`, then `'reclicked'`. `point` is where the click landed. |
 | `miss` | `{ point, originalEvent }`: a click on the image that hit no zone. A click on letterbox bars (`object-fit: contain`), padding or border emits nothing. Keyboard activation never produces a miss. |
-| `layout` | `{ zones: [{ label, position }] }`. Fired once the image is measurable and whenever its placement changes, at most once per animation frame. Use it to keep open popups next to their zone. |
+| `layout` | `{ zones: [{ label, position }] }`. Fired once the image is measurable and whenever its placement changes within its container (resize, reflow, style or `src` changes), at most once per animation frame. Use it to keep open popups next to their zone. It does not fire on page or container scroll: see below. |
 
 A click is a primary-button click or a tap, or keyboard activation when `keyboard` is on. A pointer that moves more than 5 px between down and up is a drag, not a click, so swiping the image doesn't fire zones. A cancelled touch (a scroll) produces nothing.
 
@@ -63,6 +65,8 @@ Keyboard activation gives `point` as the zone's centre and `originalEvent` as th
 
 To place a popup next to a zone, use `viewport` or `element`. Update it on `layout`.
 
+Scrolling moves the image on screen without changing its layout, so no `layout` event fires and `viewport` values go stale. For a `position: fixed` popup, re-read `map.zone(label).position.viewport` in a `scroll` listener (passive, on `window` or the scrolling container). Alternatively, place the popup in `element` space inside the image's positioned parent, which scrolls with the image and needs no updates.
+
 ```js
 map.on('click', (e) => {
   const { x, y, width } = e.position.viewport;
@@ -75,7 +79,7 @@ map.on('click', (e) => {
 - **Bubbling.** Zone clicks bubble to shared ancestors, such as an `<a>` that wraps the image. They don't reach the `<img>`'s own handlers, because the overlay is a sibling. Keyboard activation (Enter or Space) emits `click` but doesn't trigger a wrapping link's navigation. If a page wants that, it handles it in its `click` listener.
 - **Transforms.** CSS transforms on ancestors are fine, because the overlay sits in the same transformed context as the image. A transform on the `<img>` itself isn't mirrored. Under a rotation, `viewport` positions are approximate, because they are axis-aligned boxes.
 - **Disabling a map.** `pointer-events: none` on a wrapper doesn't stop zones, because the zones set their own `pointer-events`. Call `destroy()` instead.
-- **Cropping.** With `object-fit: cover` the zones outside the visible crop are clipped and not clickable. `object-position`, padding and border on the `<img>` are accounted for.
+- **Cropping.** With `object-fit: cover` the zones outside the visible crop are clipped and not clickable. `object-position`, padding and border on the `<img>` are accounted for. `object-position` may use keywords (`left`, `center`, `bottom`, …), percentages, pixels, and offsets such as `right 10px bottom 10px`, which browsers compute to `calc(100% - 10px)`; any `calc(P% ± Npx)` is supported. Other units or more complex `calc()` expressions fall back to centred.
 - **Changed art.** If the image's natural aspect ratio differs from the file's `image` size by more than 1%, hitzones warns once in the console. The art was probably swapped.
 - **Parent position.** If the image's parent is statically positioned, hitzones sets `position: relative` on it and restores it on `destroy()`. It touches no other outside style.
 
