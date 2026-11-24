@@ -21,7 +21,8 @@ export function createOverlay(img: HTMLImageElement, json: ZonesJSON, opts: Requ
   const svg = el<SVGSVGElement>('svg', {
     class: opts.className,
     preserveAspectRatio: 'none',
-    'aria-hidden': 'true',
+    // Focusable buttons must not sit inside an aria-hidden subtree.
+    ...(opts.keyboard ? {} : { 'aria-hidden': 'true' }),
     style: 'position:absolute;pointer-events:none;overflow:hidden;margin:0;max-width:none;display:none',
   });
   const shapes = new Map<string, SVGElement>();
@@ -37,6 +38,12 @@ export function createOverlay(img: HTMLImageElement, json: ZonesJSON, opts: Requ
       'data-label': z.label,
       style: `fill:transparent;pointer-events:all;cursor:${opts.cursor};${stroke}`,
     });
+    if (opts.keyboard) {
+      const aria = (z.data as { ariaLabel?: unknown } | null | undefined)?.ariaLabel;
+      s.setAttribute('tabindex', '0');
+      s.setAttribute('role', 'button');
+      s.setAttribute('aria-label', typeof aria === 'string' && aria ? aria : z.label);
+    }
     shapes.set(z.label, s);
     svg.appendChild(s);
   }

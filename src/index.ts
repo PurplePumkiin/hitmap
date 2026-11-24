@@ -1,9 +1,9 @@
-import { computeLayout, positionOf, zoneBounds, type Layout } from './geometry';
+import { computeLayout, pointFromClient, pointFromImage, positionOf, zoneBounds, type Layout } from './geometry';
 import { createEmitter } from './emitter';
 import { measure } from './measure';
 import { createOverlay } from './overlay';
 import { parseZones } from './parse';
-import type { ClickEvent, LayoutEvent, MissEvent, Options, Position, Status, Zone } from './types';
+import type { ClickEvent, LayoutEvent, MissEvent, Options, Point, Position, Status, Zone } from './types';
 
 export { parseZones } from './parse';
 export type * from './types';
@@ -31,7 +31,6 @@ export function createZones(img: HTMLImageElement, json: unknown, options: Optio
   const emitter = createEmitter<HitzonesEvents>();
   const overlay = createOverlay(img, data, opts);
   const zones = new Map(data.zones.map((z) => [z.label, z] as const));
-  // Status map: Task 4's click handling updates it.
   const status = new Map<string, { status: Status; clicks: number }>();
   const reset = () => data.zones.forEach((z) => status.set(z.label, { status: 'idle', clicks: 0 }));
   reset();
@@ -60,20 +59,24 @@ export function createZones(img: HTMLImageElement, json: unknown, options: Optio
     }
   };
 
-  // Places the SVG from a fresh measurement. Emits `layout` only when the placement changed.
+  // Places the SVG from a fresh measurement, synchronously, and returns the layout.
+  // Emits `layout` only when the placement changed.
   let last = '';
-  const realign = () => {
+  const realign = (): Layout | null => {
     const r = measured();
     if (!r) {
       last = '';
-      return overlay.hide();
+      overlay.hide();
+      return null;
     }
     const { L, offset } = r;
     const key = [L.visible, L.source, offset].map((b) => Object.values(b).join()).join('|');
-    if (key === last) return;
-    last = key;
-    overlay.apply(L, offset);
-    emitter.emit('layout', { zones: data.zones.map((z) => ({ label: z.label, position: zonePosition(z, L) })) });
+    if (key !== last) {
+      last = key;
+      overlay.apply(L, offset);
+      emitter.emit('layout', { zones: data.zones.map((z) => ({ label: z.label, position: zonePosition(z, L) })) });
+    }
+    return L;
   };
   const layout = () => {
     frame = 0;
@@ -97,11 +100,71 @@ export function createZones(img: HTMLImageElement, json: unknown, options: Optio
   if (parent) mo?.observe(parent, { childList: true });
   const fonts = (document as Document & { fonts?: EventTarget }).fonts;
   fonts?.addEventListener?.('loadingdone', schedule);
-  // Cheap re-check before any interaction, so a move nothing reported corrects itself.
-  // Capture phase: runs before Task 4's hit resolution.
-  const onDown = () => realign();
-  img.addEventListener('pointerdown', onDown, true);
-  overlay.svg.addEventListener('pointerdown', onDown, true);
+  const hit = (label: string, L: Layout, point: Point, originalEvent: Event) => {
+    const z = zones.get(label)!;
+    const s = { status: 'clicked' as const, clicks: status.get(label)!.clicks + 1 };
+    status.set(label, s);
+    emitter.emit('click', {
+      label,
+      status: s.clicks === 1 ? 'clicked' : 'reclicked',
+      clicks: s.clicks,
+      data: z.data,
+      position: zonePosition(z, L),
+      point,
+      originalEvent,
+    });
+  };
+  const zoneOf = (t: EventTarget | null) => {
+    const s = t instanceof Element ? t.closest('.hitzone') : null;
+    return s && overlay.svg.contains(s) ? s.getAttribute('data-label') : null;
+  };
+
+  // Pointer input. Down and up are paired per pointerId; a move over 5 px is a drag.
+  // Capture phase on down: re-measures before hit resolution, so a move nothing reported corrects itself.
+  const downs = new Map<number, { x: number; y: number }>();
+  const onDown = (e: PointerEvent) => {
+    realign();
+    if (e.isPrimary && e.button === 0) downs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    else downs.delete(e.pointerId);
+  };
+  const onCancel = (e: PointerEvent) => {
+    downs.delete(e.pointerId);
+  };
+  const onUp = (e: PointerEvent) => {
+    const d = downs.get(e.pointerId);
+    if (!d) return;
+    downs.delete(e.pointerId);
+    if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 5) return;
+    const L = realign();
+    if (!L) return;
+    // The pointerup target can be stale (realign may have moved the SVG, touch has implicit capture),
+    // so resolve what is under the point now.
+    const el = (img.getRootNode() as Document | ShadowRoot).elementFromPoint(e.clientX, e.clientY);
+    const point = pointFromClient(e.clientX, e.clientY, L);
+    const label = zoneOf(el);
+    if (label) return hit(label, L, point, e);
+    if (el !== img) return;
+    // On the img but outside the visible content (letterbox bar, padding, border): nothing.
+    const { x, y } = point.element;
+    const v = L.visible;
+    if (x >= v.x && x <= v.x + v.width && y >= v.y && y <= v.y + v.height) emitter.emit('miss', { point, originalEvent: e });
+  };
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const label = zoneOf(e.target);
+    const L = label && !e.repeat ? realign() : null;
+    if (!label || !L) return;
+    if (e.key === ' ') e.preventDefault(); // no page scroll
+    const b = zoneBounds(zones.get(label)!);
+    hit(label, L, pointFromImage({ x: b.x + b.width / 2, y: b.y + b.height / 2 }, L), e);
+  };
+  const pointer: [string, (e: any) => void, boolean][] = [
+    ['pointerdown', onDown, true],
+    ['pointerup', onUp, false],
+    ['pointercancel', onCancel, false],
+  ];
+  for (const t of [img, overlay.svg]) for (const [type, fn, capture] of pointer) t.addEventListener(type, fn, capture);
+  if (opts.keyboard) overlay.svg.addEventListener('keydown', onKey);
   img.addEventListener('load', onLoad);
   window.addEventListener('resize', schedule);
   if (img.complete && img.naturalWidth) onLoad();
@@ -123,8 +186,9 @@ export function createZones(img: HTMLImageElement, json: unknown, options: Optio
       ro?.disconnect();
       mo?.disconnect();
       fonts?.removeEventListener?.('loadingdone', schedule);
-      img.removeEventListener('pointerdown', onDown, true);
-      overlay.svg.removeEventListener('pointerdown', onDown, true);
+      for (const t of [img, overlay.svg]) for (const [type, fn, capture] of pointer) t.removeEventListener(type, fn, capture);
+      overlay.svg.removeEventListener('keydown', onKey);
+      downs.clear();
       img.removeEventListener('load', onLoad);
       window.removeEventListener('resize', schedule);
       if (frame) cancelAnimationFrame(frame);
