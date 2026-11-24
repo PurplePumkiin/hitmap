@@ -142,6 +142,8 @@ test('drag over 5px is not a click; 4px is', async ({ page }) => {
     ['ring', 2],
   ]);
   // A drag across empty image is not a miss either.
+  // WebKit starts a native image drag from a bare <img> and then hangs synthetic mouse moves.
+  await page.evaluate(() => ((document.getElementById('img') as HTMLImageElement).draggable = false));
   const q = await client(page, 250, 30);
   await page.mouse.move(q.x, q.y);
   await page.mouse.down();

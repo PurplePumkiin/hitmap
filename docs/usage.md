@@ -39,6 +39,8 @@ const map = createZones(document.querySelector('#scene'), zonesJson, options);
 
 A click is a primary-button click or a tap, or keyboard activation when `keyboard` is on. A pointer that moves more than 5 px between down and up is a drag, not a click, so swiping the image doesn't fire zones. A cancelled touch (a scroll) produces nothing.
 
+Safari, and desktop browsers generally, start a native image drag when someone drags an `<img>`, and the pointer is then cancelled instead of released. That is still not a click, but it breaks pan and swipe gestures. If users pan or swipe by dragging, set `draggable="false"` on the image (plus `-webkit-user-drag: none` for older Safari). hitzones doesn't change the image's behaviour itself.
+
 Where zones overlap, the later zone in the file wins and only one `click` fires.
 
 Keyboard activation gives `point` as the zone's centre and `originalEvent` as the `KeyboardEvent`.
